@@ -45,6 +45,7 @@ setup(
         'reportbro-fpdf>=1.7.4',
         'Pillow>=4.0',
         'simpleeval',
+        'typing',
         'xlsxwriter'
     ],
 

@@ -47,8 +47,20 @@ class Parameter:
                     self.fields[parameter.name] = parameter
 
 
-class TextStyle:
+class BorderStyle:
     def __init__(self, data, key_prefix=''):
+        self.border_color = Color(data.get(key_prefix + 'borderColor'))
+        self.border_width = get_int_value(data, key_prefix + 'borderWidth')
+        self.border_all = bool(data.get(key_prefix + 'borderAll'))
+        self.border_left = self.border_all or bool(data.get(key_prefix + 'borderLeft'))
+        self.border_top = self.border_all or bool(data.get(key_prefix + 'borderTop'))
+        self.border_right = self.border_all or bool(data.get(key_prefix + 'borderRight'))
+        self.border_bottom = self.border_all or bool(data.get(key_prefix + 'borderBottom'))
+
+
+class TextStyle(BorderStyle):
+    def __init__(self, data, key_prefix=''):
+        BorderStyle.__init__(self, data, key_prefix)
         self.bold = bool(data.get(key_prefix + 'bold'))
         self.italic = bool(data.get(key_prefix + 'italic'))
         self.underline = bool(data.get(key_prefix + 'underline'))
@@ -59,13 +71,6 @@ class TextStyle:
         self.font = data.get(key_prefix + 'font')
         self.font_size = get_int_value(data, key_prefix + 'fontSize')
         self.line_spacing = get_float_value(data, key_prefix + 'lineSpacing')
-        self.border_color = Color(data.get(key_prefix + 'borderColor'))
-        self.border_width = get_int_value(data, key_prefix + 'borderWidth')
-        self.border_all = bool(data.get(key_prefix + 'borderAll'))
-        self.border_left = self.border_all or bool(data.get(key_prefix + 'borderLeft'))
-        self.border_top = self.border_all or bool(data.get(key_prefix + 'borderTop'))
-        self.border_right = self.border_all or bool(data.get(key_prefix + 'borderRight'))
-        self.border_bottom = self.border_all or bool(data.get(key_prefix + 'borderBottom'))
         self.padding_left = get_int_value(data, key_prefix + 'paddingLeft')
         self.padding_top = get_int_value(data, key_prefix + 'paddingTop')
         self.padding_right = get_int_value(data, key_prefix + 'paddingRight')

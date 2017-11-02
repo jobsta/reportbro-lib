@@ -10,6 +10,7 @@ class Border(Enum):
 
 
 class RenderElementType(Enum):
+    none = 0
     complete = 1
     between = 2
     first = 3
@@ -25,6 +26,7 @@ class DocElementType(Enum):
     table = 6
     table_text = 7
     bar_code = 8
+    frame = 9
 
 
 class ParameterType(Enum):
