@@ -8,9 +8,9 @@
 * boolean parameter type
 * simple list parameter type (list items with basic type like string, number, boolean, date)
 * nullable setting for parameter to explicitly allow nullable parameters, non-nullable parameters automatically get default value in case there is no data (e.g. 0 for numbers or '' for strings)
+* allow file object as data for image parameter
 
 ### Bug Fixes
-* update table column element height when table row height is changed
 * datetime parameter is not converted to date anymore
 
 ## [0.10.1] - 2017-11-02
