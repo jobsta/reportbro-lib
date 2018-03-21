@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 jobsta
+# Copyright (C) 2017-2018 jobsta
 #
 # This file is part of ReportBro, is a library to generate PDF and Excel reports.
 # Demos can be found at https://www.reportbro.com.
@@ -25,7 +25,7 @@ import re
 import xlsxwriter
 import pkg_resources
 
-from .containers import Frame, ReportBand
+from .containers import Band, Frame, ReportBand
 from .elements import *
 from .enums import *
 from .structs import Parameter, TextStyle
@@ -328,6 +328,14 @@ class Report:
 
         self.additional_fonts = additional_fonts
 
+        version = report_definition.get('version')
+        if isinstance(version, int):
+            # convert old report definitions
+            if version < 2:
+                for doc_element in report_definition.get('docElements'):
+                    if DocElementType[doc_element.get('elementType')] == DocElementType.table:
+                        doc_element['contentDataRows'] = [doc_element.get('contentData')]
+
         # list is needed to compute parameters (parameters with expression) in given order
         parameter_list = []
         for item in report_definition.get('parameters'):
@@ -367,6 +375,14 @@ class Report:
                     width=get_int_value(doc_element, 'width'), height=get_int_value(doc_element, 'height'),
                     container_id=linked_container_id, containers=self.containers, report=self)
                 elem = FrameElement(self, doc_element, linked_container)
+            elif element_type == DocElementType.band:
+                linked_container_id = str(doc_element.get('linkedContainerId'))
+                width = self.document_properties.page_width -\
+                        self.document_properties.margin_left - self.document_properties.margin_right
+                linked_container = Band(
+                    width=width, height=get_int_value(doc_element, 'height'),
+                    container_id=linked_container_id, containers=self.containers, report=self)
+                elem = BandElement(self, doc_element, linked_container)
 
             if elem and container:
                 if container.is_visible():
@@ -387,8 +403,8 @@ class Report:
         try:
             if not self.errors:
                 self.compute_parameters(computed_parameters, self.data)
-        except ReportBroError:
-            pass
+        except ReportBroError as err:
+            self.errors.append(err.error)
 
     def generate_pdf(self, filename='', add_watermark=False):
         renderer = DocumentPDFRenderer(header_band=self.header,
@@ -412,18 +428,98 @@ class Report:
         if self.document_properties.header_display != BandDisplay.never:
             self.footer.prepare(self.context, only_verify=True)
 
+    def parse_parameter_value(self, parameter, parent_id, is_test_data, parameter_type, value):
+        error_field = 'test_data' if is_test_data else 'type'
+        if parameter_type == ParameterType.string:
+            if value is not None:
+                if not isinstance(value, basestring):
+                    raise RuntimeError('value of parameter {name} must be str type (unicode for Python 2.7.x)'.
+                            format(name=parameter.name))
+            elif not parameter.nullable:
+                value = ''
+
+        elif parameter_type == ParameterType.number:
+            if value:
+                if isinstance(value, basestring):
+                    value = value.replace(',', '.')
+                try:
+                    value = decimal.Decimal(str(value))
+                except (decimal.InvalidOperation, TypeError):
+                    if parent_id and is_test_data:
+                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                        self.errors.append(Error('errorMsgInvalidNumber', object_id=parameter.id, field='type'))
+                    else:
+                        self.errors.append(Error('errorMsgInvalidNumber',
+                                                 object_id=parameter.id, field=error_field, context=parameter.name))
+            elif value is not None:
+                if isinstance(value, (int, long, float)):
+                    value = decimal.Decimal(0)
+                elif is_test_data and isinstance(value, basestring):
+                    value = None if parameter.nullable else decimal.Decimal(0)
+                elif not isinstance(value, decimal.Decimal):
+                    if parent_id and is_test_data:
+                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                        self.errors.append(Error('errorMsgInvalidNumber', object_id=parameter.id, field='type'))
+                    else:
+                        self.errors.append(Error('errorMsgInvalidNumber',
+                                                 object_id=parameter.id, field=error_field, context=parameter.name))
+            elif not parameter.nullable:
+                value = decimal.Decimal(0)
+
+        elif parameter_type == ParameterType.boolean:
+            if value is not None:
+                value = bool(value)
+            elif not parameter.nullable:
+                value = False
+
+        elif parameter_type == ParameterType.date:
+            if isinstance(value, basestring):
+                if is_test_data and not value:
+                    value = None if parameter.nullable else datetime.datetime.now()
+                else:
+                    try:
+                        format = '%Y-%m-%d'
+                        colon_count = value.count(':')
+                        if colon_count == 1:
+                            format = '%Y-%m-%d %H:%M'
+                        elif colon_count == 2:
+                            format = '%Y-%m-%d %H:%M:%S'
+                        value = datetime.datetime.strptime(value, format)
+                    except (ValueError, TypeError):
+                        if parent_id and is_test_data:
+                            self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                            self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field='type'))
+                        else:
+                            self.errors.append(Error('errorMsgInvalidDate',
+                                                     object_id=parameter.id, field=error_field, context=parameter.name))
+            elif isinstance(value, datetime.date):
+                if not isinstance(value, datetime.datetime):
+                    value = datetime.datetime(value.year, value.month, value.day)
+            elif value is not None:
+                if parent_id and is_test_data:
+                    self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                    self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field='type'))
+                else:
+                    self.errors.append(Error('errorMsgInvalidDate',
+                                             object_id=parameter.id, field=error_field, context=parameter.name))
+            elif not parameter.nullable:
+                value = datetime.datetime.now()
+        return value
 
     def process_data(self, data, parameters, is_test_data, computed_parameters, parents):
         field = 'test_data' if is_test_data else 'type'
+        parent_id = parents[-1].id if parents else None
         for parameter in parameters:
             if parameter.is_internal:
                 continue
             if regex_valid_identifier.match(parameter.name) is None:
-                self.errors.append(Error('errorMsgInvalidParameterName', object_id=parameter.id, field='name'))
+                self.errors.append(Error('errorMsgInvalidParameterName',
+                                         object_id=parameter.id, field='name', info=parameter.name))
             parameter_type = parameter.type
             if parameter_type in (ParameterType.average, ParameterType.sum) or parameter.eval:
                 if not parameter.expression:
-                    self.errors.append(Error('errorMsgMissingExpression', object_id=parameter.id, field='expression'))
+                    self.errors.append(Error('errorMsgMissingExpression',
+                                             object_id=parameter.id, field='expression', context=parameter.name))
                 else:
                     parent_names = []
                     for parent in parents:
@@ -431,68 +527,54 @@ class Report:
                     computed_parameters.append(dict(parameter=parameter, parent_names=parent_names))
             else:
                 value = data.get(parameter.name)
-                if value is None and not is_test_data:
-                    self.errors.append(Error('errorMsgMissingData', object_id=parameter.id, field=field))
-                else:
-                    if parameter_type == ParameterType.string:
-                        if value is None:
-                            value = ''
-                        if not isinstance(value, basestring):
-                            raise RuntimeError('value of parameter {name} must be str type (unicode for Python 2.7.x)'.
-                                    format(name=parameter.name))
-                    elif parameter_type == ParameterType.number:
-                        if value:
-                            if isinstance(value, basestring):
-                                value = value.replace(',', '.')
-                            try:
-                                value = decimal.Decimal(str(value))
-                            except (decimal.InvalidOperation, TypeError):
-                                self.errors.append(Error('errorMsgInvalidNumber', object_id=parameter.id, field=field))
+                if parameter_type in (ParameterType.string, ParameterType.number,
+                                      ParameterType.boolean, ParameterType.date):
+                    value = self.parse_parameter_value(parameter, parent_id, is_test_data, parameter_type, value)
+                elif not parents:
+                    if parameter_type == ParameterType.array:
+                        if isinstance(value, list):
+                            parents.append(parameter)
+                            parameter_list = list(parameter.fields.values())
+                            for row in value:
+                                self.process_data(row, parameter_list, is_test_data, computed_parameters,
+                                    parents=parents)
+                            parents = parents[:-1]
+                        elif value is None:
+                            if not parameter.nullable:
+                                value = []
                         else:
-                            value = decimal.Decimal('0')
-                    elif parameter_type == ParameterType.date:
-                        if not value and is_test_data:
-                            value = datetime.datetime.now()
-                        elif isinstance(value, basestring):
-                            try:
-                                format = '%Y-%m-%d'
-                                colon_count = value.count(':')
-                                if colon_count == 1:
-                                    format = '%Y-%m-%d %H:%M'
-                                elif colon_count == 2:
-                                    format = '%Y-%m-%d %H:%M:%S'
-                                value = datetime.datetime.strptime(value, format)
-                            except (ValueError, TypeError):
-                                self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field=field))
-                        elif isinstance(value, datetime.date):
-                            value = datetime.datetime(value.year, value.month, value.day)
-                        elif not isinstance(value, datetime.datetime):
-                            self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field=field))
-                    elif not parents:
-                        if parameter_type == ParameterType.array:
-                            if isinstance(value, list):
+                            self.errors.append(Error('errorMsgInvalidArray',
+                                                     object_id=parameter.id, field=field, context=parameter.name))
+                    elif parameter_type == ParameterType.simple_array:
+                        if isinstance(value, list):
+                            list_values = []
+                            for list_value in value:
+                                parsed_value = self.parse_parameter_value(
+                                    parameter, parent_id, is_test_data, parameter.array_item_type, list_value)
+                                list_values.append(parsed_value)
+                            value = list_values
+                        elif value is None:
+                            if not parameter.nullable:
+                                value = []
+                        else:
+                            self.errors.append(Error('errorMsgInvalidArray',
+                                                     object_id=parameter.id, field=field, context=parameter.name))
+                    elif parameter_type == ParameterType.map:
+                        if value is None and not parameter.nullable:
+                            value = dict()
+                        if isinstance(value, dict):
+                            if isinstance(parameter.children, list):
                                 parents.append(parameter)
-                                parameter_list = list(parameter.fields.values())
-                                for row in value:
-                                    self.process_data(row, parameter_list, is_test_data, computed_parameters,
-                                        parents=parents)
+                                self.process_data(value, parameter.children, is_test_data, computed_parameters,
+                                    parents=parents)
                                 parents = parents[:-1]
                             else:
-                                error_object_id = parents[-1].id if parents else parameter.id
-                                self.errors.append(Error('errorMsgInvalidArray',
-                                        object_id=error_object_id, field=field))
-                        elif parameter_type == ParameterType.map:
-                            if isinstance(value, dict):
-                                if isinstance(parameter.children, list):
-                                    parents.append(parameter)
-                                    self.process_data(value, parameter.children, is_test_data, computed_parameters,
-                                        parents=parents)
-                                    parents = parents[:-1]
-                                else:
-                                    self.errors.append(Error('errorMsgInvalidMap', object_id=parameter.id, field='type'))
-                            else:
-                                self.errors.append(Error('errorMsgMissingData', object_id=parameter.id, field='name'))
-                    data[parameter.name] = value
+                                self.errors.append(Error('errorMsgInvalidMap',
+                                                         object_id=parameter.id, field='type', context=parameter.name))
+                        else:
+                            self.errors.append(Error('errorMsgMissingData',
+                                                     object_id=parameter.id, field='name', context=parameter.name))
+                data[parameter.name] = value
 
     def compute_parameters(self, computed_parameters, data):
         for computed_parameter in computed_parameters:
@@ -503,21 +585,21 @@ class Report:
                 pos = expr.find('.')
                 if pos == -1:
                     self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                            object_id=parameter.id, field='expression'))
+                            object_id=parameter.id, field='expression', context=parameter.name))
                 else:
                     parameter_name = expr[:pos]
                     parameter_field = expr[pos+1:]
                     items = data.get(parameter_name)
                     if not isinstance(items, list):
                         self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                                object_id=parameter.id, field='expression'))
+                                object_id=parameter.id, field='expression', context=parameter.name))
                     else:
                         total = decimal.Decimal(0)
                         for item in items:
                             item_value = item.get(parameter_field)
                             if item_value is None:
                                 self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                                        object_id=parameter.id, field='expression'))
+                                        object_id=parameter.id, field='expression', context=parameter.name))
                                 break
                             total += item_value
                         if parameter.type == ParameterType.average:
@@ -533,7 +615,7 @@ class Report:
                 data_entry = data_entry.get(parent_name)
                 if not isinstance(data_entry, dict):
                     self.errors.append(Error('errorMsgInvalidParameterData',
-                            object_id=parameter.id, field='name'))
+                            object_id=parameter.id, field='name', context=parameter.name))
                     valid = False
             if valid:
                 data_entry[parameter.name] = value

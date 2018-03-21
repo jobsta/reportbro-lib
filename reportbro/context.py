@@ -41,10 +41,10 @@ class Context:
         if data is None:
             data = self.data
         if name in data:
-            return data[name]
+            return data[name], True
         elif data.get('__parent'):
             return self.get_data(name, data.get('__parent'))
-        return None
+        return None, False
 
     def push_context(self, parameters, data):
         parameters['__parent'] = self.parameters
@@ -88,27 +88,32 @@ class Context:
                         field_name = name_parts[1]
                         parameter = self.get_parameter(collection_name)
                         if parameter is None:
-                            self.report.errors.append(Error('errorMsgInvalidExpressionNameNotDefined',
-                                    object_id=object_id, field=field, info=collection_name))
-                            raise ReportBroError()
+                            raise ReportBroError(
+                                Error('errorMsgInvalidExpressionNameNotDefined',
+                                      object_id=object_id, field=field, info=collection_name))
                     else:
                         parameter = self.get_parameter(parameter_name)
                         if parameter is None:
-                            self.report.errors.append(Error('errorMsgInvalidExpressionNameNotDefined',
-                                    object_id=object_id, field=field, info=parameter_name))
-                            raise ReportBroError()
+                            raise ReportBroError(
+                                Error('errorMsgInvalidExpressionNameNotDefined',
+                                      object_id=object_id, field=field, info=parameter_name))
                     value = None
+                    parameter_exists = False
                     if parameter.type == ParameterType.map:
                         parameter = self.get_parameter(field_name, parameters=parameter.fields)
                         if parameter is None:
-                            self.report.errors.append(Error('errorMsgInvalidExpressionNameNotDefined',
-                                    object_id=object_id, field=field, info=parameter_name))
-                            raise ReportBroError()
-                        map_value = self.get_data(collection_name)
+                            raise ReportBroError(
+                                Error('errorMsgInvalidExpressionNameNotDefined',
+                                      object_id=object_id, field=field, info=parameter_name))
+                        map_value, parameter_exists = self.get_data(collection_name)
                         if parameter and isinstance(map_value, dict):
                             value = map_value.get(field_name)
                     else:
-                        value = self.get_data(parameter_name)
+                        value, parameter_exists = self.get_data(parameter_name)
+                    if not parameter_exists:
+                        raise ReportBroError(
+                            Error('errorMsgMissingParameterData',
+                                  object_id=object_id, field=field, info=parameter_name))
                     if value is not None:
                         if parameter.type == ParameterType.string:
                             ret += value
@@ -127,9 +132,8 @@ class Context:
                                     ret += value
                                 except ValueError:
                                     error_object_id = object_id if pattern else parameter.id
-                                    self.report.errors.append(Error('errorMsgInvalidPattern',
-                                            object_id=error_object_id, field='pattern'))
-                                    raise ReportBroError()
+                                    raise ReportBroError(
+                                        Error('errorMsgInvalidPattern', object_id=error_object_id, field='pattern'))
                             else:
                                 ret += str(value)
                         elif parameter.type == ParameterType.date:
@@ -139,15 +143,11 @@ class Context:
                                     ret += format_datetime(value, used_pattern, locale=self.pattern_locale)
                                 except ValueError:
                                     error_object_id = object_id if pattern else parameter.id
-                                    self.report.errors.append(Error('errorMsgInvalidPattern',
-                                            object_id=error_object_id, field='pattern'))
-                                    raise ReportBroError()
+                                    raise ReportBroError(
+                                        Error('errorMsgInvalidPattern',
+                                              object_id=error_object_id, field='pattern', context=expr))
                             else:
                                 ret += str(value)
-                    else:
-                        self.report.errors.append(Error('errorMsgMissingParameterData',
-                                object_id=object_id, field=field, info=parameter_name))
-                        raise ReportBroError()
                     parameter_index = -1
             prev_c = c
         return ret
@@ -159,21 +159,20 @@ class Context:
                 expr = self.replace_parameters(expr, data=data)
                 return simple_eval(expr, names=data, functions=self.eval_functions)
             except NameNotDefined as ex:
-                self.report.errors.append(Error('errorMsgInvalidExpressionNameNotDefined',
-                        object_id=object_id, field=field, info=ex.name))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidExpressionNameNotDefined',
+                          object_id=object_id, field=field, info=ex.name, context=expr))
             except FunctionNotDefined as ex:
-                self.report.errors.append(Error('errorMsgInvalidExpressionFuncNotDefined',
-                        object_id=object_id, field=field, info=ex.func_name))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidExpressionFuncNotDefined',
+                          object_id=object_id, field=field, info=ex.func_name, context=expr))
             except SyntaxError as ex:
-                self.report.errors.append(Error('errorMsgInvalidExpression',
-                        object_id=object_id, field=field, info=ex.msg))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=ex.msg, context=expr))
             except Exception as ex:
-                self.report.errors.append(Error('errorMsgInvalidExpression',
-                        object_id=object_id, field=field, info=ex.message))
-                raise ReportBroError()
+                info = ex.message if isinstance(ex.message, str) else 'error'
+                raise ReportBroError(
+                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=info, context=expr))
         return True
 
     @staticmethod
@@ -199,7 +198,7 @@ class Context:
                         name_parts = parameter_name.split('.')
                         collection_name = name_parts[0]
                         field_name = name_parts[1]
-                        value = self.get_data(collection_name)
+                        value, parameter_exists = self.get_data(collection_name)
                         if isinstance(value, dict):
                             value = value.get(field_name)
                         else:
@@ -207,7 +206,7 @@ class Context:
                         # use valid python identifier for parameter name
                         parameter_name = collection_name + '_' + field_name
                     else:
-                        value = self.get_data(parameter_name)
+                        value, parameter_exists = self.get_data(parameter_name)
                     if isinstance(value, decimal.Decimal):
                         value = float(value)
                     data[parameter_name] = value

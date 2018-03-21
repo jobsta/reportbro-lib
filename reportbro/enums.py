@@ -27,18 +27,21 @@ class DocElementType(Enum):
     table_text = 7
     bar_code = 8
     frame = 9
+    band = 10
 
 
 class ParameterType(Enum):
     none = 0
     string = 1
     number = 2
-    date = 3
-    array = 4
-    map = 5
-    sum = 6
-    average = 7
-    image = 8
+    boolean = 3
+    date = 4
+    array = 5
+    simple_array = 6
+    map = 7
+    sum = 8
+    average = 9
+    image = 10
 
 
 class BandType(Enum):

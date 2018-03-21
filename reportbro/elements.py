@@ -3,7 +3,7 @@ from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
 from io import BytesIO
-from PIL import Image
+from typing import List
 import base64
 import datetime
 import decimal
@@ -148,62 +148,58 @@ class ImageElement(DocElement):
             source_parameter = ctx.get_parameter(Context.strip_parameter_name(self.source))
             if source_parameter:
                 if source_parameter.type == ParameterType.string:
-                    self.image_key = ctx.get_data(source_parameter.name)
+                    self.image_key, parameter_exists = ctx.get_data(source_parameter.name)
                     is_url = True
                 elif source_parameter.type == ParameterType.image:
-                    # image is available as base64 encoded
-                    img_data_b64 = ctx.get_data(source_parameter.name)
+                    # image is available as base64 encoded or
+                    # file object (only possible if report data is passed directly from python code
+                    # and not via web request)
+                    img_data, parameter_exists = ctx.get_data(source_parameter.name)
+                    if isinstance(img_data, file):
+                        self.image_fp = img_data
+                        pos = img_data.name.rfind('.')
+                        self.image_type = img_data.name[pos+1:] if pos != -1 else ''
+                    elif isinstance(img_data, (str, unicode)):
+                        img_data_b64 = img_data
                 else:
-                    self.report.errors.append(Error('errorMsgInvalidImageSourceParameter',
-                            object_id=self.id, field='source'))
-                    raise ReportBroError()
+                    raise ReportBroError(
+                        Error('errorMsgInvalidImageSourceParameter', object_id=self.id, field='source'))
             else:
                 source = self.source.strip()
                 if source[0:2] == '${' and source[-1] == '}':
-                    self.report.errors.append(Error('errorMsgMissingParameter',
-                            object_id=self.id, field='source'))
-                    raise ReportBroError()
+                    raise ReportBroError(
+                        Error('errorMsgMissingParameter', object_id=self.id, field='source'))
                 self.image_key = self.source
                 is_url = True
-        if img_data_b64 is None and not is_url:
+
+        if img_data_b64 is None and not is_url and self.image_fp is None:
             if self.image_filename and self.image:
                 # static image base64 encoded within image element
                 img_data_b64 = self.image
                 self.image_key = self.image_filename
-            else:
-                if not self.report.is_test_data:
-                    self.report.errors.append(Error('errorMsgMissingImage',
-                            object_id=self.id, field='source'))
-                    raise ReportBroError()
 
         if img_data_b64:
             m = re.match('^data:image/(.+);base64,', img_data_b64)
             if not m:
-                self.report.errors.append(Error('errorMsgInvalidImage',
-                        object_id=self.id, field='source'))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidImage', object_id=self.id, field='source'))
             self.image_type = m.group(1).lower()
-            if self.image_type not in ('png', 'jpg', 'jpeg'):
-                self.report.errors.append(Error('errorMsgUnsupportedImageType',
-                        object_id=self.id, field='source'))
-                raise ReportBroError()
-            if not self.image_key:
-                self.image_key = 'image_' + str(self.id) + '.' + self.image_type
             img_data = base64.b64decode(re.sub('^data:image/.+;base64,', '', img_data_b64))
             self.image_fp = BytesIO(img_data)
         elif is_url:
             if not (self.image_key and
                     (self.image_key.startswith("http://") or self.image_key.startswith("https://"))):
-                self.report.errors.append(Error('errorMsgInvalidImageSource',
-                        object_id=self.id, field='source'))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidImageSource', object_id=self.id, field='source'))
             pos = self.image_key.rfind('.')
-            if pos != -1:
-                self.image_type = self.image_key[pos+1:]
-            if not (self.image_type and self.image_type in ('png', 'jpg', 'jpeg')):
-                self.report.errors.append(Error('errorMsgUnsupportedImageType',
-                        object_id=self.id, field='source'))
-                raise ReportBroError()
+            self.image_type = self.image_key[pos+1:] if pos != -1 else ''
+
+        if self.image_type is not None:
+            if self.image_type not in ('png', 'jpg', 'jpeg'):
+                raise ReportBroError(
+                    Error('errorMsgUnsupportedImageType', object_id=self.id, field='source'))
+            if not self.image_key:
+                self.image_key = 'image_' + str(self.id) + '.' + self.image_type
         self.image = None
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
@@ -262,8 +258,8 @@ class BarCodeElement(DocElement):
             try:
                 img = code128_image(self.content, height=self.image_height, thickness=2, quiet_zone=False)
             except:
-                self.report.errors.append(Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
             if not only_verify:
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as f:
                     img.save(f.name)
@@ -381,16 +377,14 @@ class TextElement(DocElement):
                         if self.pattern.find('$') != -1:
                             content = content.replace('$', ctx.pattern_currency_symbol)
                     except ValueError:
-                        self.report.errors.append(Error('errorMsgInvalidPattern',
-                                object_id=self.id, field='pattern'))
-                        raise ReportBroError()
+                        raise ReportBroError(
+                            Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
                 elif isinstance(content, (datetime.date, datetime.datetime)):
                     try:
                         content = format_datetime(content, self.pattern, locale=ctx.pattern_locale)
                     except ValueError:
-                        self.report.errors.append(Error('errorMsgInvalidPattern',
-                                object_id=self.id, field='pattern'))
-                        raise ReportBroError()
+                        raise ReportBroError(
+                            Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
             content = to_string(content)
         else:
             content = ctx.fill_parameters(self.content, self.id, field='content', pattern=self.pattern)
@@ -412,8 +406,8 @@ class TextElement(DocElement):
                 try:
                     lines = pdf_doc.multi_cell(available_width, 0, content, align=self.used_style.text_align, split_only=True)
                 except UnicodeEncodeError:
-                    self.report.errors.append(Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content'))
-                    raise ReportBroError()
+                    raise ReportBroError(
+                        Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
             else:
                 lines = []
             self.line_height = self.used_style.font_size * self.used_style.line_spacing
@@ -500,8 +494,8 @@ class TextElement(DocElement):
                 return None, False
             else:
                 # already on top of container -> raise error
-                self.report.errors.append(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
-                raise ReportBroError()
+                raise ReportBroError(
+                    Error('errorMsgInvalidSize', object_id=self.id, field='size'))
 
         rendering_complete = self.line_index >= self.lines_count and self.space_top == 0 and self.space_bottom == 0
         if not rendering_complete and remaining_height > 0:
@@ -688,7 +682,7 @@ class TableTextElement(TextElement):
 
 
 class TableRow(object):
-    def __init__(self, report, table_band, columns):
+    def __init__(self, report, table_band, columns, prev_row=None):
         assert len(columns) <= len(table_band.column_data)
         self.column_data = []
         for column in columns:
@@ -701,12 +695,33 @@ class TableRow(object):
         self.alternate_background_color = table_band.background_color
         if table_band.band_type == BandType.content and not table_band.alternate_background_color.transparent:
             self.alternate_background_color = table_band.alternate_background_color
+        self.group_expression = ''
+        self.print_if_result = True
+        self.prev_row = prev_row
+        self.next_row = None
+        if prev_row is not None:
+            prev_row.next_row = self
+
+    def is_printed(self, ctx):
+        printed = self.print_if_result
+        if printed and self.table_band.group_expression:
+            if self.table_band.before_group:
+                printed = self.prev_row is None or self.group_expression != self.prev_row.group_expression
+            else:
+                printed = self.next_row is None or self.group_expression != self.next_row.group_expression
+        return printed
 
     def prepare(self, ctx, pdf_doc, row_index=-1, only_verify=False):
         if only_verify:
             for column_element in self.column_data:
                 column_element.prepare(ctx, pdf_doc, only_verify=True)
         else:
+            if self.table_band.group_expression:
+                self.group_expression = ctx.evaluate_expression(
+                    self.table_band.group_expression, self.table_band.id, field='group_expression')
+            if self.table_band.print_if:
+                self.print_if_result = ctx.evaluate_expression(
+                    self.table_band.print_if, self.table_band.id, field='print_if')
             heights = [self.table_band.height]
             for column_element in self.column_data:
                 column_element.prepare(ctx, pdf_doc, only_verify=False)
@@ -723,8 +738,8 @@ class TableRow(object):
 
     def create_render_elements(self, offset_y, container_height, ctx, pdf_doc):
         for column_element in self.column_data:
-            render_element, _ = column_element.get_next_render_element(offset_y=offset_y,
-                    container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
+            render_element, _ = column_element.get_next_render_element(
+                offset_y=offset_y, container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
             if render_element is None:
                 raise RuntimeError('TableRow.create_render_elements failed - failed to create column render_element')
             self.render_elements.append(render_element)
@@ -755,7 +770,6 @@ class TableRow(object):
         if self.render_elements:
             return self.render_elements[0].render_y
         return 0
-
 
 
 class TableBlockElement(DocElementBase):
@@ -847,7 +861,16 @@ class TableElement(DocElement):
         header = bool(data.get('header'))
         footer = bool(data.get('footer'))
         self.header = TableBandElement(data.get('headerData'), BandType.header) if header else None
-        self.content = TableBandElement(data.get('contentData'), BandType.content)
+        self.content_rows = []
+        content_data_rows = data.get('contentDataRows')
+        assert isinstance(content_data_rows, list)
+        main_content_created = False
+        for content_data_row in content_data_rows:
+            band_element = TableBandElement(content_data_row, BandType.content,
+                                            before_group=not main_content_created)
+            if not main_content_created and not band_element.group_expression:
+                main_content_created = True
+            self.content_rows.append(band_element)
         self.footer = TableBandElement(data.get('footerData'), BandType.footer) if footer else None
         self.print_header = self.header is not None
         self.print_footer = self.footer is not None
@@ -862,15 +885,19 @@ class TableElement(DocElement):
         self.rows = []
         self.row_count = 0
         self.row_index = -1
-        self.prepared_rows = []
+        self.prepared_rows = []  # type: List[TableRow]
+        self.prev_content_rows = [None] * len(self.content_rows)  # type: List[TableRow]
         self.width = 0
-        self.bottom = self.y + self.content.height
+        self.bottom = self.y
         if self.header:
             self.bottom += self.header.height
         if self.footer:
             self.bottom += self.footer.height
-        for column in self.content.column_data:
-            self.width += column.get('width', 0)
+        if len(self.content_rows) > 0:
+            for content_row in self.content_rows:
+                 self.bottom += content_row.height
+            for column in self.content_rows[0].column_data:
+                self.width += column.get('width', 0)
         self.first_render_element = True
 
     def prepare(self, ctx, pdf_doc, only_verify):
@@ -883,24 +910,20 @@ class TableElement(DocElement):
         parameter_name = Context.strip_parameter_name(self.data_source)
         self.data_source_parameter = ctx.get_parameter(parameter_name)
         if not self.data_source_parameter:
-            self.report.errors.append(Error('errorMsgMissingDataSourceParameter',
-                    object_id=self.id, field='data_source'))
-            raise ReportBroError()
+            raise ReportBroError(
+                Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='data_source'))
         if self.data_source_parameter.type != ParameterType.array:
-            self.report.errors.append(Error('errorMsgInvalidDataSourceParameter',
-                    object_id=self.id, field='data_source'))
-            raise ReportBroError()
+            raise ReportBroError(
+                Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
         for row_parameter in self.data_source_parameter.children:
             self.row_parameters[row_parameter.name] = row_parameter
-        self.rows = ctx.get_data(self.data_source_parameter.name)
-        if self.rows is None:
-            self.report.errors.append(Error('errorMsgMissingData',
-                    object_id=self.id, field='data_source'))
-            raise ReportBroError()
+        self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
+        if not parameter_exists:
+            raise ReportBroError(
+                Error('errorMsgMissingData', object_id=self.id, field='data_source'))
         if not isinstance(self.rows, list):
-            self.report.errors.append(Error('errorMsgInvalidDataSource',
-                    object_id=self.id, field='data_source'))
-            raise ReportBroError()
+            raise ReportBroError(
+                Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
 
         self.row_count = len(self.rows)
         self.row_index = 0
@@ -909,23 +932,17 @@ class TableElement(DocElement):
             if self.print_header:
                 table_row = TableRow(self.report, self.header, self.columns)
                 table_row.prepare(ctx, pdf_doc=None, only_verify=True)
-            data_context_added = False
             while self.row_index < self.row_count:
                 # push data context of current row so values of current row can be accessed
-                if data_context_added:
-                    ctx.pop_context()
-                else:
-                    data_context_added = True
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
-                table_row = TableRow(self.report, self.content, self.columns)
-                table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index, only_verify=True)
-                self.row_index += 1
-            if data_context_added:
+                for content_row in self.content_rows:
+                    table_row = TableRow(self.report, content_row, self.columns)
+                    table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index, only_verify=True)
                 ctx.pop_context()
+                self.row_index += 1
             if self.print_footer:
                 table_row = TableRow(self.report, self.footer, self.columns)
                 table_row.prepare(ctx, pdf_doc=None, only_verify=True)
-
 
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
         self.render_y = offset_y
@@ -934,6 +951,12 @@ class TableElement(DocElement):
             self.rendering_complete = True
             return None, True
         render_element = TableBlockElement(self.report, self.x, self.width, self)
+
+        # batch size can be anything >= 3 because each row needs previous and next row to evaluate
+        # group expression (in case it is set), the batch size defines the number of table rows
+        # which will be prepared before they are rendered
+        batch_size = 10
+        remaining_batch_size = batch_size
 
         # add header in case it is not already available in prepared rows (from previous page)
         if self.print_header and (len(self.prepared_rows) == 0 or
@@ -944,37 +967,33 @@ class TableElement(DocElement):
             if not self.header.repeat_header:
                 self.print_header = False
 
-        data_context_added = False
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
-            if data_context_added:
-                ctx.pop_context()
-            else:
-                data_context_added = True
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
-            table_row = TableRow(self.report, self.content, self.columns)
-            table_row.prepare(ctx, pdf_doc, row_index=self.row_index)
-            self.prepared_rows.append(table_row)
-            self.row_index += 1
-            if self.row_index < self.row_count or not self.print_footer:
-                available_height = container_height - offset_y - render_element.height
-                self.update_render_element(render_element, offset_y, available_height, container_height, ctx, pdf_doc)
-                if render_element.complete:
-                    break
-        if data_context_added:
+            for i, content_row in enumerate(self.content_rows):
+                table_row = TableRow(self.report, content_row, self.columns, prev_row=self.prev_content_rows[i])
+                table_row.prepare(ctx, pdf_doc, row_index=self.row_index)
+                self.prepared_rows.append(table_row)
+                self.prev_content_rows[i] = table_row
             ctx.pop_context()
+            remaining_batch_size -= 1
+            self.row_index += 1
+            if remaining_batch_size == 0:
+                remaining_batch_size = batch_size
+                if self.row_index < self.row_count or not self.print_footer:
+                    self.update_render_element(render_element, offset_y, container_height, ctx, pdf_doc)
+                    if render_element.complete:
+                        break
 
         if self.row_index >= self.row_count and self.print_footer:
             table_row = TableRow(self.report, self.footer, self.columns)
             table_row.prepare(ctx, pdf_doc)
             self.prepared_rows.append(table_row)
             self.print_footer = False
-            available_height = container_height - offset_y - render_element.height
-            self.update_render_element(render_element, offset_y, available_height, container_height, ctx, pdf_doc)
 
-        available_height = container_height - offset_y - render_element.height
-        self.update_render_element(render_element, offset_y, available_height, container_height, ctx, pdf_doc)
+        self.update_render_element(render_element, offset_y, container_height, ctx, pdf_doc)
+
         if render_element.is_empty():
             return None, False
         self.render_bottom += render_element.height
@@ -983,23 +1002,43 @@ class TableElement(DocElement):
             self.rendering_complete = True
         return render_element, self.rendering_complete
 
-    def update_render_element(self, render_element, offset_y, height, container_height, ctx, pdf_doc):
-        while not render_element.complete and self.prepared_rows:
+    def update_render_element(self, render_element, offset_y, container_height, ctx, pdf_doc):
+        available_height = container_height - offset_y
+        filtered_rows = []
+        rows_for_next_update = []
+        all_rows_processed = (self.row_index >= self.row_count)
+        for prepared_row in self.prepared_rows:
+            if prepared_row.table_band.band_type == BandType.content:
+                if prepared_row.next_row is not None or all_rows_processed:
+                    if prepared_row.is_printed(ctx):
+                        filtered_rows.append(prepared_row)
+                else:
+                    rows_for_next_update.append(prepared_row)
+            else:
+                filtered_rows.append(prepared_row)
+
+        while not render_element.complete and filtered_rows:
             add_row_count = 1
-            if len(self.prepared_rows) >= 2 and (self.prepared_rows[0].table_band.band_type == BandType.header or
-                    self.prepared_rows[-1].table_band.band_type == BandType.footer):
+            if len(filtered_rows) >= 2 and\
+                    (filtered_rows[0].table_band.band_type == BandType.header or
+                     filtered_rows[-1].table_band.band_type == BandType.footer):
                 # make sure header row is not printed alone on a page
                 add_row_count = 2
             # allow splitting multiple rows (header + content or footer) in case we are already at top
             # of the container and there is not enough space for both rows
             allow_split = (offset_y == 0)
-            rows_added = render_element.add_rows(self.prepared_rows[:add_row_count], allow_split=allow_split,
-                    available_height=height, offset_y=offset_y, container_height=container_height,
-                    ctx=ctx, pdf_doc=pdf_doc)
+            height = available_height - render_element.height
+            rows_added = render_element.add_rows(
+                filtered_rows[:add_row_count], allow_split=allow_split,
+                available_height=height, offset_y=offset_y, container_height=container_height,
+                ctx=ctx, pdf_doc=pdf_doc)
             if rows_added == 0:
                 break
-            self.prepared_rows = self.prepared_rows[rows_added:]
+            filtered_rows = filtered_rows[rows_added:]
             self.first_render_element = False
+
+        self.prepared_rows = filtered_rows
+        self.prepared_rows.extend(rows_for_next_update)
 
     def is_rendering_complete(self):
         return (not self.print_header or (self.header and self.header.repeat_header)) and\
@@ -1023,9 +1062,10 @@ class TableElement(DocElement):
                 data_context_added = True
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
-            table_row = TableRow(self.report, self.content, self.columns)
-            table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index)
-            row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
+            for content_row in self.content_rows:
+                table_row = TableRow(self.report, content_row, self.columns)
+                table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index)
+                row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
             self.row_index += 1
         if data_context_added:
             ctx.pop_context()
@@ -1044,7 +1084,8 @@ class TableElement(DocElement):
 
 
 class TableBandElement(object):
-    def __init__(self, data, band_type):
+    def __init__(self, data, band_type, before_group=False):
+        self.id = data.get('id', '')
         self.height = get_int_value(data, 'height')
         self.band_type = band_type
         if band_type == BandType.header:
@@ -1057,6 +1098,9 @@ class TableBandElement(object):
         else:
             self.alternate_background_color = None
         self.column_data = data.get('columnData')
+        self.group_expression = data.get('groupExpression', '')
+        self.print_if = data.get('printIf', '')
+        self.before_group = before_group
         assert isinstance(self.column_data, list)
 
 
@@ -1214,6 +1258,129 @@ class FrameElement(DocElement):
         row, col = self.container.render_spreadsheet(row, col, ctx, workbook, worksheet)
         if self.spreadsheet_add_empty_row:
             row += 1
+        return row, col
+
+    def cleanup(self):
+        self.container.cleanup()
+
+
+class BandElement(DocElement):
+    def __init__(self, report, data, container):
+        DocElement.__init__(self, report, data)
+        self.container = container
+        self.data_source = data.get('dataSource', '')
+        self.print_if = data.get('printIf', '')
+        self.remove_empty_element = bool(data.get('removeEmptyElement'))
+        self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
+
+        self.data_source_parameter = None
+        self.row_parameters = dict()
+        self.rows = []
+        self.row_count = 0
+        self.row_index = -1
+        self.row_rendering_complete = True
+        self.row_rendering_started = False
+
+    def prepare(self, ctx, pdf_doc, only_verify):
+        parameter_name = Context.strip_parameter_name(self.data_source)
+        self.data_source_parameter = ctx.get_parameter(parameter_name)
+        if not self.data_source_parameter:
+            raise ReportBroError(
+                Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='data_source'))
+        if self.data_source_parameter.type != ParameterType.array:
+            raise ReportBroError(
+                Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
+        for row_parameter in self.data_source_parameter.children:
+            self.row_parameters[row_parameter.name] = row_parameter
+        self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
+        if not parameter_exists:
+            raise ReportBroError(
+                Error('errorMsgMissingData', object_id=self.id, field='data_source'))
+        if not isinstance(self.rows, list):
+            raise ReportBroError(
+                Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
+
+        self.row_count = len(self.rows)
+        self.row_index = 0
+
+        if only_verify:
+            data_context_added = False
+            while self.row_index < self.row_count:
+                # push data context of current row so values of current row can be accessed
+                if data_context_added:
+                    ctx.pop_context()
+                else:
+                    data_context_added = True
+                ctx.push_context(self.row_parameters, self.rows[self.row_index])
+                self.container.prepare(ctx, pdf_doc=None, only_verify=True)
+                self.row_index += 1
+            if data_context_added:
+                ctx.pop_context()
+
+    def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
+        self.render_y = offset_y
+        self.render_bottom = self.render_y
+        if self.is_rendering_complete():
+            self.rendering_complete = True
+            return None, True
+
+        available_height = container_height - offset_y
+        self.container.reset_first_element_offset_y()
+        if not self.row_rendering_complete:
+            # band was not finished on previous page -> render remaining elements
+            # context of current row is still active, pop after rendering is complete
+            self.row_rendering_complete = self.container.create_render_elements(available_height, ctx, pdf_doc)
+
+            band_height = self.container.get_used_band_height()
+            if not self.row_rendering_started and self.row_rendering_complete and\
+                    not self.shrink_to_content_height and band_height < self.height:
+                band_height = self.height
+            self.render_bottom += band_height
+            self.container.inc_first_element_offset_y(band_height)
+
+            if self.row_rendering_complete:
+                ctx.pop_context()
+                self.row_index += 1
+            else:
+                return self, False
+
+        while self.row_index < self.row_count:
+            # push data context of current row so values of current row can be accessed
+            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+
+            self.container.prepare(ctx, pdf_doc=pdf_doc)
+            elements_count_before_rendering = len(self.container.render_elements)
+            self.row_rendering_complete = self.container.create_render_elements(available_height, ctx, pdf_doc)
+
+            band_height = self.container.get_used_band_height()
+            if self.row_rendering_complete and not self.shrink_to_content_height and band_height < self.height:
+                band_height = self.height
+            self.render_bottom += band_height
+            self.container.inc_first_element_offset_y(band_height)
+
+            if not self.row_rendering_complete:
+                # leave data context of current row in case rendering is not complete
+
+                self.row_rendering_started = self.container.render_elements_created
+                return self, False
+
+            ctx.pop_context()
+            self.row_index += 1
+
+        if self.is_rendering_complete():
+            self.rendering_complete = True
+        return self, self.rendering_complete
+
+    def is_rendering_complete(self):
+        return self.row_index >= self.row_count and self.row_rendering_complete
+
+    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
+        x = self.x + container_offset_x
+        y = self.render_y + container_offset_y
+        self.container.render_pdf(container_offset_x=x, container_offset_y=y, pdf_doc=pdf_doc)
+
+    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+        row, col = self.container.render_spreadsheet(row, col, ctx, workbook, worksheet)
         return row, col
 
     def cleanup(self):

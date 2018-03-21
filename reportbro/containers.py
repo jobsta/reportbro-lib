@@ -16,8 +16,11 @@ class Container(object):
         self.container_offset_y = 0
         self.sorted_elements = None  # type: List[DocElementBase]
         self.render_elements = None  # type: List[DocElementBase]
+        self.render_elements_created = False
+        self.reset_render_elements = True
         self.explicit_page_break = True
         self.page_y = 0
+        self.first_element_offset_y = 0
 
     def add(self, doc_element):
         self.doc_elements.append(doc_element)
@@ -48,7 +51,8 @@ class Container(object):
                         predecessor = elem2
                 if predecessor and not isinstance(predecessor, PageBreakElement):
                     elem.set_predecessor(predecessor)
-            self.render_elements = []
+            if self.reset_render_elements:
+                self.render_elements = []
         else:
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.x))
 
@@ -63,6 +67,7 @@ class Container(object):
         processed_elements = []
         completed_elements = dict()
 
+        self.render_elements_created = False
         set_explicit_page_break = False
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
@@ -95,6 +100,7 @@ class Container(object):
                                 offset_y = 0
                         else:
                             offset_y = elem.y
+                        offset_y += self.first_element_offset_y
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
@@ -106,6 +112,7 @@ class Container(object):
                                 if complete:
                                     processed_elements.append(elem)
                                 self.render_elements.append(render_elem)
+                                self.render_elements_created = True
                     else:
                         processed_elements.append(elem)
                         elem.finish_empty_element(offset_y)
@@ -179,6 +186,30 @@ class Frame(Container):
         Container.__init__(self, container_id, containers, report)
         self.width = width
         self.height = height
+        self.allow_page_break = False
+
+
+# custom band inside content band
+class Band(Container):
+    def __init__(self, width, height, container_id, containers, report):
+        Container.__init__(self, container_id, containers, report)
+        self.width = width
+        self.height = height
+        self.render_elements = []
+        self.reset_render_elements = False
+
+    def reset_first_element_offset_y(self):
+        self.first_element_offset_y = 0
+
+    def inc_first_element_offset_y(self, val):
+        self.first_element_offset_y += val
+
+    def get_used_band_height(self):
+        height = 0
+        for elem in self.render_elements:
+            if elem.render_bottom > height:
+                height = elem.render_bottom
+        return height - self.first_element_offset_y
 
 
 class ReportBand(Container):

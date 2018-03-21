@@ -28,7 +28,12 @@ class Parameter:
         self.id = int(data.get('id'))
         self.name = data.get('name', '<unnamed>')
         self.type = ParameterType[data.get('type')]
+        if self.type == ParameterType.simple_array:
+            self.array_item_type = ParameterType[data.get('arrayItemType')]
+        else:
+            self.array_item_type = ParameterType.none
         self.eval = bool(data.get('eval'))
+        self.nullable = bool(data.get('nullable'))
         self.expression = data.get('expression', '')
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = (self.pattern.find('$') != -1)
