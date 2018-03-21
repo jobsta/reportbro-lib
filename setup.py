@@ -42,7 +42,7 @@ setup(
     install_requires=[
         'Babel>=2.0',
         'enum34',
-        'reportbro-fpdf>=1.7.4',
+        'reportbro-fpdf>=1.7.5',
         'Pillow>=4.0',
         'simpleeval',
         'typing',
