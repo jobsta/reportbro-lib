@@ -57,9 +57,11 @@ class Container(object):
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.x))
 
     def get_render_elements_bottom(self):
-        if self.render_elements:
-            return self.render_elements[-1].render_bottom
-        return 0
+        bottom = 0
+        for render_element in self.render_elements:
+            if render_element.render_bottom > bottom:
+                bottom = render_element.render_bottom
+        return bottom
 
     def create_render_elements(self, container_height, ctx, pdf_doc):
         i = 0
