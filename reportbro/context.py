@@ -98,7 +98,6 @@ class Context:
                                 Error('errorMsgInvalidExpressionNameNotDefined',
                                       object_id=object_id, field=field, info=parameter_name))
                     value = None
-                    parameter_exists = False
                     if parameter.type == ParameterType.map:
                         parameter = self.get_parameter(field_name, parameters=parameter.fields)
                         if parameter is None:
@@ -114,40 +113,9 @@ class Context:
                         raise ReportBroError(
                             Error('errorMsgMissingParameterData',
                                   object_id=object_id, field=field, info=parameter_name))
+
                     if value is not None:
-                        if parameter.type == ParameterType.string:
-                            ret += value
-                        elif parameter.type in (ParameterType.number, ParameterType.average, ParameterType.sum):
-                            if pattern:
-                                used_pattern = pattern
-                                pattern_has_currency = (pattern.find('$') != -1)
-                            else:
-                                used_pattern = parameter.pattern
-                                pattern_has_currency = parameter.pattern_has_currency
-                            if used_pattern:
-                                try:
-                                    value = format_decimal(value, used_pattern, locale=self.pattern_locale)
-                                    if pattern_has_currency:
-                                        value = value.replace('$', self.pattern_currency_symbol)
-                                    ret += value
-                                except ValueError:
-                                    error_object_id = object_id if pattern else parameter.id
-                                    raise ReportBroError(
-                                        Error('errorMsgInvalidPattern', object_id=error_object_id, field='pattern'))
-                            else:
-                                ret += str(value)
-                        elif parameter.type == ParameterType.date:
-                            used_pattern = pattern if pattern else parameter.pattern
-                            if used_pattern:
-                                try:
-                                    ret += format_datetime(value, used_pattern, locale=self.pattern_locale)
-                                except ValueError:
-                                    error_object_id = object_id if pattern else parameter.id
-                                    raise ReportBroError(
-                                        Error('errorMsgInvalidPattern',
-                                              object_id=error_object_id, field='pattern', context=expr))
-                            else:
-                                ret += str(value)
+                        ret += self.get_formatted_value(value, parameter, object_id, pattern=pattern)
                     parameter_index = -1
             prev_c = c
         return ret
@@ -180,6 +148,51 @@ class Context:
         if expr:
             return expr.strip().lstrip('${').rstrip('}')
         return expr
+
+    @staticmethod
+    def is_parameter_name(expr):
+        return expr and expr.lstrip().startswith('${') and expr.rstrip().endswith('}')
+
+    def get_formatted_value(self, value, parameter, object_id, pattern=None, is_array_item=False):
+        rv = ''
+        if is_array_item and parameter.type == ParameterType.simple_array:
+            value_type = parameter.array_item_type
+        else:
+            value_type = parameter.type
+        if value_type == ParameterType.string:
+            rv = value
+        elif value_type in (ParameterType.number, ParameterType.average, ParameterType.sum):
+            if pattern:
+                used_pattern = pattern
+                pattern_has_currency = (pattern.find('$') != -1)
+            else:
+                used_pattern = parameter.pattern
+                pattern_has_currency = parameter.pattern_has_currency
+            if used_pattern:
+                try:
+                    value = format_decimal(value, used_pattern, locale=self.pattern_locale)
+                    if pattern_has_currency:
+                        value = value.replace('$', self.pattern_currency_symbol)
+                    rv = value
+                except ValueError:
+                    error_object_id = object_id if pattern else parameter.id
+                    raise ReportBroError(
+                        Error('errorMsgInvalidPattern', object_id=error_object_id, field='pattern'))
+            else:
+                rv = str(value)
+        elif value_type == ParameterType.date:
+            used_pattern = pattern if pattern else parameter.pattern
+            if used_pattern:
+                try:
+                    rv = format_datetime(value, used_pattern, locale=self.pattern_locale)
+                except ValueError:
+                    error_object_id = object_id if pattern else parameter.id
+                    raise ReportBroError(
+                        Error('errorMsgInvalidPattern',
+                              object_id=error_object_id, field='pattern', context=expr))
+            else:
+                rv = str(value)
+        return rv
 
     def replace_parameters(self, expr, data=None):
         pos = expr.find('${')

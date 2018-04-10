@@ -379,7 +379,7 @@ class TextElement(DocElement):
                     except ValueError:
                         raise ReportBroError(
                             Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
-                elif isinstance(content, (datetime.date, datetime.datetime)):
+                elif isinstance(content, datetime.date):
                     try:
                         content = format_datetime(content, self.pattern, locale=ctx.pattern_locale)
                     except ValueError:
@@ -682,11 +682,36 @@ class TableTextElement(TextElement):
 
 
 class TableRow(object):
-    def __init__(self, report, table_band, columns, prev_row=None):
+    def __init__(self, report, table_band, columns, ctx, prev_row=None):
         assert len(columns) <= len(table_band.column_data)
         self.column_data = []
         for column in columns:
-            self.column_data.append(TableTextElement(report, table_band.column_data[column]))
+            column_element = TableTextElement(report, table_band.column_data[column])
+            self.column_data.append(column_element)
+
+            if table_band.column_data[column].get('simple_array') != False:
+                # in case value of column is a simple array parameter we create multiple columns,
+                # one for each array entry of parameter data
+                is_simple_array = False
+                if column_element.content and not column_element.eval and\
+                        Context.is_parameter_name(column_element.content):
+                    column_data_parameter = ctx.get_parameter(Context.strip_parameter_name(column_element.content))
+                    if column_data_parameter and column_data_parameter.type == ParameterType.simple_array:
+                        is_simple_array = True
+                        column_values, parameter_exists = ctx.get_data(column_data_parameter.name)
+                        for idx, column_value in enumerate(column_values):
+                            formatted_val = ctx.get_formatted_value(column_value, column_data_parameter,
+                                                                    object_id=None, is_array_item=True)
+                            if idx == 0:
+                                column_element.content = formatted_val
+                            else:
+                                column_element = TableTextElement(report, table_band.column_data[column])
+                                column_element.content = formatted_val
+                                self.column_data.append(column_element)
+                # store info if column content is a simple array parameter to
+                # avoid checks for the next rows
+                table_band.column_data[column]['simple_array'] = is_simple_array
+
         self.height = 0
         self.always_print_on_same_page = True
         self.table_band = table_band
@@ -930,18 +955,18 @@ class TableElement(DocElement):
 
         if only_verify:
             if self.print_header:
-                table_row = TableRow(self.report, self.header, self.columns)
+                table_row = TableRow(self.report, self.header, self.columns, ctx=ctx)
                 table_row.prepare(ctx, pdf_doc=None, only_verify=True)
             while self.row_index < self.row_count:
                 # push data context of current row so values of current row can be accessed
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
                 for content_row in self.content_rows:
-                    table_row = TableRow(self.report, content_row, self.columns)
+                    table_row = TableRow(self.report, content_row, self.columns, ctx=ctx)
                     table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index, only_verify=True)
                 ctx.pop_context()
                 self.row_index += 1
             if self.print_footer:
-                table_row = TableRow(self.report, self.footer, self.columns)
+                table_row = TableRow(self.report, self.footer, self.columns, ctx=ctx)
                 table_row.prepare(ctx, pdf_doc=None, only_verify=True)
 
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
@@ -961,7 +986,7 @@ class TableElement(DocElement):
         # add header in case it is not already available in prepared rows (from previous page)
         if self.print_header and (len(self.prepared_rows) == 0 or
                 self.prepared_rows[0].table_band.band_type != BandType.header):
-            table_row = TableRow(self.report, self.header, self.columns)
+            table_row = TableRow(self.report, self.header, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc)
             self.prepared_rows.insert(0, table_row)
             if not self.header.repeat_header:
@@ -972,7 +997,8 @@ class TableElement(DocElement):
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
             for i, content_row in enumerate(self.content_rows):
-                table_row = TableRow(self.report, content_row, self.columns, prev_row=self.prev_content_rows[i])
+                table_row = TableRow(self.report, content_row, self.columns,
+                                     ctx=ctx, prev_row=self.prev_content_rows[i])
                 table_row.prepare(ctx, pdf_doc, row_index=self.row_index)
                 self.prepared_rows.append(table_row)
                 self.prev_content_rows[i] = table_row
@@ -987,7 +1013,7 @@ class TableElement(DocElement):
                         break
 
         if self.row_index >= self.row_count and self.print_footer:
-            table_row = TableRow(self.report, self.footer, self.columns)
+            table_row = TableRow(self.report, self.footer, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc)
             self.prepared_rows.append(table_row)
             self.print_footer = False
@@ -1049,7 +1075,7 @@ class TableElement(DocElement):
             col = self.spreadsheet_column - 1
 
         if self.print_header:
-            table_row = TableRow(self.report, self.header, self.columns)
+            table_row = TableRow(self.report, self.header, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc=None)
             row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
 
@@ -1063,7 +1089,7 @@ class TableElement(DocElement):
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
             for content_row in self.content_rows:
-                table_row = TableRow(self.report, content_row, self.columns)
+                table_row = TableRow(self.report, content_row, self.columns, ctx=ctx)
                 table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index)
                 row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
             self.row_index += 1
@@ -1071,7 +1097,7 @@ class TableElement(DocElement):
             ctx.pop_context()
 
         if self.print_footer:
-            table_row = TableRow(self.report, self.footer, self.columns)
+            table_row = TableRow(self.report, self.footer, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc=None)
             row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
 
