@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.2] - 2018-04-10
+
+### Features
+* support for dynamic table column (column containing simple array parameter will be expanded to multiple columns)
+
+### Bug Fixes
+* fix calculation of frame height (could lead to wrong positioning of following elements)
+
 ## [0.11.1] - 2018-03-21
 
 ### Features
