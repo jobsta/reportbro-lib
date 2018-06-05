@@ -8,7 +8,12 @@ def get_int_value(data, key):
 
 def get_float_value(data, key):
     value = data.get(key)
-    return float(value) if value else 0.0
+    if value:
+        if isinstance(value, (float, int)):
+            return float(value)
+        if isinstance(value, (str, unicode)):
+            return float(value.replace(',', '.'))
+    return 0.0
 
 
 def to_string(val):

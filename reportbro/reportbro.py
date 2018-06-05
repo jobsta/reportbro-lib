@@ -25,7 +25,7 @@ import re
 import xlsxwriter
 import pkg_resources
 
-from .containers import Band, Frame, ReportBand
+from .containers import ReportBand
 from .elements import *
 from .enums import *
 from .structs import Parameter, TextStyle
@@ -139,6 +139,7 @@ class DocumentXLSXRenderer:
         self.context = context
         self.filename = filename
         self.row = 0
+        self.column_widths = []
 
     def render(self):
         if self.document_properties.header_display != BandDisplay.never:
@@ -146,6 +147,13 @@ class DocumentXLSXRenderer:
         self.render_band(self.content_band)
         if self.document_properties.header_display != BandDisplay.never:
             self.render_band(self.footer_band)
+
+        for i, column_width in enumerate(self.column_widths):
+            if column_width > 0:
+                # setting the column width is just an approximation, in Excel the width
+                # is the number of characters in the default font
+                self.worksheet.set_column(i, i, column_width / 7)
+
         self.workbook.close()
         if not self.filename:
             # if no filename is given the spreadsheet data will be returned
@@ -155,7 +163,28 @@ class DocumentXLSXRenderer:
 
     def render_band(self, band):
         band.prepare(self.context)
-        self.row, _ = band.render_spreadsheet(self.row, 0, self.context, self.workbook, self.worksheet)
+        self.row, _ = band.render_spreadsheet(self.row, 0, self.context, self)
+
+    def update_column_width(self, col, width):
+        if col >= len(self.column_widths):
+            # make sure column_width list contains entries for each column
+            self.column_widths.extend([-1] * (col + 1 - len(self.column_widths)))
+        if width > self.column_widths[col]:
+            self.column_widths[col] = width
+
+    def write(self, row, col, colspan, text, cell_format, width):
+        if colspan > 1:
+            self.worksheet.merge_range(row, col, row, col + colspan - 1, text, cell_format)
+        else:
+            self.worksheet.write(row, col, text, cell_format)
+            self.update_column_width(col, width)
+
+    def insert_image(self, row, col, image_filename, width):
+        self.worksheet.insert_image(row, col, image_filename)
+        self.update_column_width(col, width)
+
+    def add_format(self, format_props):
+        return self.workbook.add_format(format_props)
 
 
 class DocumentProperties:
@@ -370,19 +399,9 @@ class Report:
             elif element_type == DocElementType.page_break:
                 elem = PageBreakElement(self, doc_element)
             elif element_type == DocElementType.frame:
-                linked_container_id = str(doc_element.get('linkedContainerId'))
-                linked_container = Frame(
-                    width=get_int_value(doc_element, 'width'), height=get_int_value(doc_element, 'height'),
-                    container_id=linked_container_id, containers=self.containers, report=self)
-                elem = FrameElement(self, doc_element, linked_container)
-            elif element_type == DocElementType.band:
-                linked_container_id = str(doc_element.get('linkedContainerId'))
-                width = self.document_properties.page_width -\
-                        self.document_properties.margin_left - self.document_properties.margin_right
-                linked_container = Band(
-                    width=width, height=get_int_value(doc_element, 'height'),
-                    container_id=linked_container_id, containers=self.containers, report=self)
-                elem = BandElement(self, doc_element, linked_container)
+                elem = FrameElement(self, doc_element, self.containers)
+            elif element_type == DocElementType.section:
+                elem = SectionElement(self, doc_element, self.containers)
 
             if elem and container:
                 if container.is_visible():

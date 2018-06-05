@@ -16,7 +16,7 @@ from .context import Context
 from .enums import *
 from .errors import Error, ReportBroError
 from .structs import Color, BorderStyle, TextStyle
-from .utils import get_int_value, to_string
+from .utils import get_float_value, get_int_value, to_string
 
 try:
     from urllib.request import urlopen  # For Python 3.0 and later
@@ -40,13 +40,36 @@ class DocElementBase(object):
         self.spreadsheet_add_empty_row = False
         self.first_render_element = True
         self.rendering_complete = False
-        self.predecessor = None
+        self.predecessors = []
         self.successors = []
         self.sort_order = 1  # sort order for elements with same 'y'-value
 
-    def set_predecessor(self, predecessor):
-        self.predecessor = predecessor
+    def is_predecessor(self, elem):
+        # if bottom of element is above y-coord of first predecessor we do not need to store
+        # the predecessor here because the element is already a predecessor of the first predecessor
+        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom > self.predecessors[0].y)
+
+    def add_predecessor(self, predecessor):
+        self.predecessors.append(predecessor)
         predecessor.successors.append(self)
+
+    # returns True in case there is at least one predecessor which is not completely rendered yet
+    def has_uncompleted_predecessor(self, completed_elements):
+        for predecessor in self.predecessors:
+            if predecessor.id not in completed_elements or not predecessor.rendering_complete:
+                return True
+        return False
+
+    def get_offset_y(self):
+        max_offset_y = 0
+        for predecessor in self.predecessors:
+            offset_y = predecessor.render_bottom + (self.y - predecessor.bottom)
+            if offset_y > max_offset_y:
+                max_offset_y = offset_y
+        return max_offset_y
+
+    def clear_predecessors(self):
+        self.predecessors = []
 
     def prepare(self, ctx, pdf_doc, only_verify):
         pass
@@ -70,7 +93,7 @@ class DocElementBase(object):
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         pass
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         return row, col
 
     def cleanup(self):
@@ -216,11 +239,11 @@ class ImageElement(DocElement):
             pdf_doc.image(self.image_key, x, y, self.width, self.height, type=self.image_type,
                     image_fp=self.image_fp, halign=halign, valign=valign)
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         if self.image_key:
             if self.spreadsheet_column:
                 col = self.spreadsheet_column - 1
-            worksheet.insert_image(row, col, self.image_key)
+            renderer.insert_image(row, col, self.image_key, self.width)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1
         return row, col
@@ -241,6 +264,7 @@ class BarCodeElement(DocElement):
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
+        self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.image_key = None
         self.image_height = self.height - 22 if self.display_value else self.height
@@ -278,12 +302,12 @@ class BarCodeElement(DocElement):
                 offset_x = (self.width - content_width) / 2
                 pdf_doc.text(x + offset_x, y + self.image_height + 20, self.content)
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         if self.content:
             cell_format = dict()
             if self.spreadsheet_column:
                 col = self.spreadsheet_column - 1
-            worksheet.write(row, col, self.content, cell_format)
+            renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1
         return row, col
@@ -349,6 +373,7 @@ class TextElement(DocElement):
         self.height = get_int_value(data, 'height')
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
+        self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.text_height = 0
         self.line_index = -1
@@ -530,7 +555,7 @@ class TextElement(DocElement):
     def is_first_render_element(self):
         return self.first_render_element
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         cell_format = None
         if not self.spreadsheet_cell_format_initialized:
             format_props = dict()
@@ -551,8 +576,6 @@ class TextElement(DocElement):
                 format_props['font_color'] = self.used_style.text_color.color_code
             if not self.used_style.background_color.transparent:
                 format_props['bg_color'] = self.used_style.background_color.color_code
-            if self.used_style.font_size != 12:
-                format_props['font_size'] = self.used_style.font_size
             if self.used_style.border_left or self.used_style.border_top or\
                     self.used_style.border_right or self.used_style.border_bottom:
                 if not self.used_style.border_color.is_black():
@@ -566,7 +589,7 @@ class TextElement(DocElement):
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
             if format_props:
-                cell_format = workbook.add_format(format_props)
+                cell_format = renderer.add_format(format_props)
                 if isinstance(self, TableTextElement):
                     # format can be used in following rows
                     self.spreadsheet_cell_format = cell_format
@@ -575,7 +598,7 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_cell_format
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        worksheet.write(row, col, self.content, cell_format)
+        renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + 1
@@ -775,9 +798,9 @@ class TableRow(object):
             render_element.render_pdf(container_offset_x=x, container_offset_y=container_offset_y, pdf_doc=pdf_doc)
             x += render_element.width
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         for column_element in self.column_data:
-            column_element.render_spreadsheet(row, col, ctx, workbook, worksheet)
+            column_element.render_spreadsheet(row, col, ctx, renderer)
             col += 1
         return row + 1
 
@@ -901,7 +924,7 @@ class TableElement(DocElement):
         self.print_footer = self.footer is not None
         self.border = Border[data.get('border')]
         self.border_color = Color(data.get('borderColor'))
-        self.border_width = 1
+        self.border_width = get_float_value(data, 'borderWidth')
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
@@ -1070,14 +1093,15 @@ class TableElement(DocElement):
         return (not self.print_header or (self.header and self.header.repeat_header)) and\
                not self.print_footer and self.row_index >= self.row_count and len(self.prepared_rows) == 0
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
 
         if self.print_header:
             table_row = TableRow(self.report, self.header, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc=None)
-            row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
+            if table_row.is_printed(ctx):
+                row = table_row.render_spreadsheet(row, col, ctx, renderer)
 
         data_context_added = False
         while self.row_index < self.row_count:
@@ -1088,18 +1112,28 @@ class TableElement(DocElement):
                 data_context_added = True
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
-            for content_row in self.content_rows:
-                table_row = TableRow(self.report, content_row, self.columns, ctx=ctx)
+            for i, content_row in enumerate(self.content_rows):
+                table_row = TableRow(
+                    self.report, content_row, self.columns, ctx=ctx, prev_row=self.prev_content_rows[i])
                 table_row.prepare(ctx, pdf_doc=None, row_index=self.row_index)
-                row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
+                # render rows from previous preparation because we need next row set (used for group_expression)
+                if self.prev_content_rows[i] is not None and self.prev_content_rows[i].is_printed(ctx):
+                    row = self.prev_content_rows[i].render_spreadsheet(row, col, ctx, renderer)
+
+                self.prev_content_rows[i] = table_row
             self.row_index += 1
         if data_context_added:
             ctx.pop_context()
 
+        for i, prev_content_row in enumerate(self.prev_content_rows):
+            if self.prev_content_rows[i] is not None and self.prev_content_rows[i].is_printed(ctx):
+                row = self.prev_content_rows[i].render_spreadsheet(row, col, ctx, renderer)
+
         if self.print_footer:
             table_row = TableRow(self.report, self.footer, self.columns, ctx=ctx)
             table_row.prepare(ctx, pdf_doc=None)
-            row = table_row.render_spreadsheet(row, col, ctx, workbook, worksheet)
+            if table_row.is_printed(ctx):
+                row = table_row.render_spreadsheet(row, col, ctx, renderer)
 
         if self.spreadsheet_add_empty_row:
             row += 1
@@ -1131,9 +1165,9 @@ class TableBandElement(object):
 
 
 class FrameElement(DocElement):
-    def __init__(self, report, data, container):
+    def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
-        self.container = container
+        from .containers import Frame
         self.background_color = Color(data.get('backgroundColor'))
         self.border_style = BorderStyle(data)
         self.print_if = data.get('printIf', '')
@@ -1149,6 +1183,9 @@ class FrameElement(DocElement):
         self.prev_page_content_height = 0
 
         self.render_element_type = RenderElementType.none
+        self.container = Frame(
+            width=self.width, height=self.height,
+            container_id=str(data.get('linkedContainerId')), containers=containers, report=report)
 
     def get_used_height(self):
         height = self.container.get_render_elements_bottom()
@@ -1278,10 +1315,10 @@ class FrameElement(DocElement):
                 x=x, y=y, width=self.width, height=height,
                 render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        row, col = self.container.render_spreadsheet(row, col, ctx, workbook, worksheet)
+        row, col = self.container.render_spreadsheet(row, col, ctx, renderer)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row, col
@@ -1290,22 +1327,148 @@ class FrameElement(DocElement):
         self.container.cleanup()
 
 
-class BandElement(DocElement):
-    def __init__(self, report, data, container):
+class SectionBandElement(object):
+    def __init__(self, report, data, band_type, containers):
+        from .containers import Container
+        assert(isinstance(data, dict))
+        self.id = data.get('id', '')
+        self.width = report.document_properties.page_width -\
+            report.document_properties.margin_left - report.document_properties.margin_right
+        self.height = get_int_value(data, 'height')
+        self.band_type = band_type
+        if band_type == BandType.header:
+            self.repeat_header = bool(data.get('repeatHeader'))
+            self.always_print_on_same_page = True
+        else:
+            self.repeat_header = None
+            self.always_print_on_same_page = bool(data.get('alwaysPrintOnSamePage'))
+        self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
+
+        self.container = Container(
+            container_id=str(data.get('linkedContainerId')), containers=containers, report=report)
+        self.container.width = self.width
+        self.container.height = self.height
+        self.container.allow_page_break = False
+        self.rendering_complete = False
+        self.prepare_container = True
+        self.rendered_band_height = 0
+
+    def prepare(self, ctx, pdf_doc, only_verify):
+        pass
+
+    def create_render_elements(self, offset_y, container_height, ctx, pdf_doc):
+        available_height = container_height - offset_y
+        if self.always_print_on_same_page and not self.shrink_to_content_height and\
+                (container_height - offset_y) < self.height:
+            # not enough space for whole band
+            self.rendering_complete = False
+        else:
+            if self.prepare_container:
+                self.container.prepare(ctx, pdf_doc)
+                self.rendered_band_height = 0
+            else:
+                self.rendered_band_height += self.container.used_band_height
+                # clear render elements from previous page
+                self.container.clear_rendered_elements()
+            self.rendering_complete = self.container.create_render_elements(available_height, ctx=ctx, pdf_doc=pdf_doc)
+
+        if self.rendering_complete:
+            remaining_min_height = self.height - self.rendered_band_height
+            if not self.shrink_to_content_height and self.container.used_band_height < remaining_min_height:
+                # rendering of band complete, make sure band is at least as large
+                # as minimum height (even if it spans over more than 1 page)
+                if remaining_min_height <= available_height:
+                    self.prepare_container = True
+                    self.container.used_band_height = remaining_min_height
+                else:
+                    # minimum height is larger than available space, continue on next page
+                    self.rendering_complete = False
+                    self.prepare_container = False
+                    self.container.used_band_height = available_height
+            else:
+                self.prepare_container = True
+        else:
+            if self.always_print_on_same_page:
+                # band must be printed on same page but available space is not enough,
+                # try to render it on top of next page
+                self.prepare_container = True
+                if offset_y == 0:
+                    field = 'size' if self.band_type == BandType.header else 'always_print_on_same_page'
+                    raise ReportBroError(
+                        Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
+            else:
+                self.prepare_container = False
+                self.container.first_element_offset_y = available_height
+                self.container.used_band_height = available_height
+
+    def get_used_band_height(self):
+        return self.container.used_band_height
+
+    def get_render_elements(self):
+        return self.container.render_elements
+
+
+class SectionBlockElement(DocElementBase):
+    def __init__(self, report, render_y):
+        DocElementBase.__init__(self, report, dict(y=0))
+        self.report = report
+        self.render_y = render_y
+        self.render_bottom = render_y
+        self.height = 0
+        self.bands = []
+        self.complete = False
+
+    def is_empty(self):
+        return len(self.bands) == 0
+
+    def add_section_band(self, section_band):
+        if section_band.rendering_complete or not section_band.always_print_on_same_page:
+            band_height = section_band.get_used_band_height()
+            self.bands.append(dict(height=band_height, elements=list(section_band.get_render_elements())))
+            self.height += band_height
+            self.render_bottom += band_height
+
+    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
+        y = self.render_y + container_offset_y
+        for band in self.bands:
+            for element in band['elements']:
+                element.render_pdf(container_offset_x=container_offset_x, container_offset_y=y, pdf_doc=pdf_doc)
+            y += band['height']
+
+
+class SectionElement(DocElement):
+    def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
-        self.container = container
         self.data_source = data.get('dataSource', '')
         self.print_if = data.get('printIf', '')
-        self.remove_empty_element = bool(data.get('removeEmptyElement'))
-        self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
+
+        header = bool(data.get('header'))
+        footer = bool(data.get('footer'))
+        if header:
+            self.header = SectionBandElement(report, data.get('headerData'), BandType.header, containers)
+        else:
+            self.header = None
+        self.content = SectionBandElement(report, data.get('contentData'), BandType.content, containers)
+        if footer:
+            self.footer = SectionBandElement(report, data.get('footerData'), BandType.footer, containers)
+        else:
+            self.footer = None
+        self.print_header = self.header is not None
+
+        self.x = 0
+        self.width = 0
+        self.height = self.content.height
+        if self.header:
+            self.height += self.header.height
+        if self.footer:
+            self.height += self.footer.height
+        self.bottom = self.y + self.height
 
         self.data_source_parameter = None
         self.row_parameters = dict()
         self.rows = []
         self.row_count = 0
         self.row_index = -1
-        self.row_rendering_complete = True
-        self.row_rendering_started = False
 
     def prepare(self, ctx, pdf_doc, only_verify):
         parameter_name = Context.strip_parameter_name(self.data_source)
@@ -1330,84 +1493,62 @@ class BandElement(DocElement):
         self.row_index = 0
 
         if only_verify:
-            data_context_added = False
+            if self.header:
+                self.header.prepare(ctx, pdf_doc=None, only_verify=True)
             while self.row_index < self.row_count:
                 # push data context of current row so values of current row can be accessed
-                if data_context_added:
-                    ctx.pop_context()
-                else:
-                    data_context_added = True
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
-                self.container.prepare(ctx, pdf_doc=None, only_verify=True)
-                self.row_index += 1
-            if data_context_added:
+                self.content.prepare(ctx, pdf_doc=None, only_verify=True)
                 ctx.pop_context()
+                self.row_index += 1
+            if self.footer:
+                self.footer.prepare(ctx, pdf_doc=None, only_verify=True)
 
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
-        if self.is_rendering_complete():
-            self.rendering_complete = True
-            return None, True
+        render_element = SectionBlockElement(self.report, render_y=offset_y)
 
-        available_height = container_height - offset_y
-        self.container.reset_first_element_offset_y()
-        if not self.row_rendering_complete:
-            # band was not finished on previous page -> render remaining elements
-            # context of current row is still active, pop after rendering is complete
-            self.row_rendering_complete = self.container.create_render_elements(available_height, ctx, pdf_doc)
-
-            band_height = self.container.get_used_band_height()
-            if not self.row_rendering_started and self.row_rendering_complete and\
-                    not self.shrink_to_content_height and band_height < self.height:
-                band_height = self.height
-            self.render_bottom += band_height
-            self.container.inc_first_element_offset_y(band_height)
-
-            if self.row_rendering_complete:
-                ctx.pop_context()
-                self.row_index += 1
-            else:
-                return self, False
+        if self.print_header:
+            self.header.create_render_elements(offset_y, container_height, ctx, pdf_doc)
+            render_element.add_section_band(self.header)
+            if not self.header.rendering_complete:
+                return render_element, False
+            if not self.header.repeat_header:
+                self.print_header = False
 
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
-
-            self.container.prepare(ctx, pdf_doc=pdf_doc)
-            elements_count_before_rendering = len(self.container.render_elements)
-            self.row_rendering_complete = self.container.create_render_elements(available_height, ctx, pdf_doc)
-
-            band_height = self.container.get_used_band_height()
-            if self.row_rendering_complete and not self.shrink_to_content_height and band_height < self.height:
-                band_height = self.height
-            self.render_bottom += band_height
-            self.container.inc_first_element_offset_y(band_height)
-
-            if not self.row_rendering_complete:
-                # leave data context of current row in case rendering is not complete
-
-                self.row_rendering_started = self.container.render_elements_created
-                return self, False
-
+            self.content.create_render_elements(offset_y + render_element.height, container_height, ctx, pdf_doc)
             ctx.pop_context()
+            render_element.add_section_band(self.content)
+            if not self.content.rendering_complete:
+                return render_element, False
             self.row_index += 1
 
-        if self.is_rendering_complete():
-            self.rendering_complete = True
-        return self, self.rendering_complete
+        if self.footer:
+            self.footer.create_render_elements(offset_y + render_element.height, container_height, ctx, pdf_doc)
+            render_element.add_section_band(self.footer)
+            if not self.footer.rendering_complete:
+                return render_element, False
 
-    def is_rendering_complete(self):
-        return self.row_index >= self.row_count and self.row_rendering_complete
+        # all bands finished
+        self.rendering_complete = True
+        self.render_bottom += render_element.height
+        return render_element, True
 
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y
-        self.container.render_pdf(container_offset_x=x, container_offset_y=y, pdf_doc=pdf_doc)
-
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
-        row, col = self.container.render_spreadsheet(row, col, ctx, workbook, worksheet)
+    def render_spreadsheet(self, row, col, ctx, renderer):
+        if self.header:
+            row, _ = self.header.container.render_spreadsheet(row, col, ctx, renderer)
+        row, _ = self.content.container.render_spreadsheet(row, col, ctx, renderer)
+        if self.footer:
+            row, _ = self.footer.container.render_spreadsheet(row, col, ctx, renderer)
         return row, col
 
     def cleanup(self):
-        self.container.cleanup()
+        if self.header:
+            self.header.container.cleanup()
+        self.content.container.cleanup()
+        if self.footer:
+            self.footer.container.cleanup()

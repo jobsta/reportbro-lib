@@ -55,7 +55,7 @@ class Parameter:
 class BorderStyle:
     def __init__(self, data, key_prefix=''):
         self.border_color = Color(data.get(key_prefix + 'borderColor'))
-        self.border_width = get_int_value(data, key_prefix + 'borderWidth')
+        self.border_width = get_float_value(data, key_prefix + 'borderWidth')
         self.border_all = bool(data.get(key_prefix + 'borderAll'))
         self.border_left = self.border_all or bool(data.get(key_prefix + 'borderLeft'))
         self.border_top = self.border_all or bool(data.get(key_prefix + 'borderTop'))

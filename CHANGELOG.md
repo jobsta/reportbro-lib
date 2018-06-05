@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.1] - 2018-06-06
+
+### Features
+* section elements to iterate lists
+* set column width for xls export
+* column range spreadsheet property
+* allow decimal values for border width
+
+### Bug Fixes
+* fix element rendering position in case height of element above grows and the element is not first one above
+* do not set text size in xls export (because row default height is always used)
+* fix rendering spreadsheet when table content rows contain group expression
+
 ## [0.11.2] - 2018-04-10
 
 ### Features

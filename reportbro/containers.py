@@ -1,5 +1,5 @@
 from typing import List
-from .elements import DocElementBase, PageBreakElement, TableElement
+from .elements import DocElementBase, PageBreakElement
 from .enums import BandType
 
 
@@ -17,10 +17,10 @@ class Container(object):
         self.sorted_elements = None  # type: List[DocElementBase]
         self.render_elements = None  # type: List[DocElementBase]
         self.render_elements_created = False
-        self.reset_render_elements = True
         self.explicit_page_break = True
         self.page_y = 0
         self.first_element_offset_y = 0
+        self.used_band_height = 0
 
     def add(self, doc_element):
         self.doc_elements.append(doc_element)
@@ -43,18 +43,22 @@ class Container(object):
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.sort_order))
             # predecessors are only needed for rendering pdf document
             for i, elem in enumerate(self.sorted_elements):
-                predecessor = None
                 for j in range(i-1, -1, -1):
                     elem2 = self.sorted_elements[j]
-                    if elem2.bottom <= elem.y and\
-                            (predecessor is None or elem2.bottom > predecessor.bottom):
-                        predecessor = elem2
-                if predecessor and not isinstance(predecessor, PageBreakElement):
-                    elem.set_predecessor(predecessor)
-            if self.reset_render_elements:
-                self.render_elements = []
+                    if isinstance(elem2, PageBreakElement):
+                        # new page so all elements before are not direct predecessors
+                        break
+                    if elem.is_predecessor(elem2):
+                        elem.add_predecessor(elem2)
+            self.render_elements = []
+            self.used_band_height = 0
+            self.first_element_offset_y = 0
         else:
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.x))
+
+    def clear_rendered_elements(self):
+        self.render_elements = []
+        self.used_band_height = 0
 
     def get_render_elements_bottom(self):
         bottom = 0
@@ -73,9 +77,8 @@ class Container(object):
         set_explicit_page_break = False
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
-            if elem.predecessor and (elem.predecessor.id not in completed_elements or
-                    not elem.predecessor.rendering_complete):
-                # predecessor is not completed yet -> start new page
+            if elem.has_uncompleted_predecessor(completed_elements):
+                # a predecessor is not completed yet -> start new page
                 new_page = True
             else:
                 elem_deleted = False
@@ -91,9 +94,9 @@ class Container(object):
                         return True
                 else:
                     complete = False
-                    if elem.predecessor:
-                        # element is on same page as predecessor element so offset is relative to predecessor
-                        offset_y = elem.predecessor.render_bottom + (elem.y - elem.predecessor.bottom)
+                    if elem.predecessors:
+                        # element is on same page as predecessor element(s) so offset is relative to predecessors
+                        offset_y = elem.get_offset_y()
                     else:
                         if self.allow_page_break:
                             if elem.first_render_element and self.explicit_page_break:
@@ -101,8 +104,9 @@ class Container(object):
                             else:
                                 offset_y = 0
                         else:
-                            offset_y = elem.y
-                        offset_y += self.first_element_offset_y
+                            offset_y = elem.y - self.first_element_offset_y
+                            if offset_y < 0:
+                                offset_y = 0
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
@@ -115,6 +119,8 @@ class Container(object):
                                     processed_elements.append(elem)
                                 self.render_elements.append(render_elem)
                                 self.render_elements_created = True
+                                if render_elem.render_bottom > self.used_band_height:
+                                    self.used_band_height = render_elem.render_bottom
                     else:
                         processed_elements.append(elem)
                         elem.finish_empty_element(offset_y)
@@ -131,12 +137,13 @@ class Container(object):
         self.explicit_page_break = set_explicit_page_break if self.allow_page_break else True
 
         if len(self.sorted_elements) > 0:
-            self.render_elements.append(PageBreakElement(self.report, dict(y=-1)))
+            if self.allow_page_break:
+                self.render_elements.append(PageBreakElement(self.report, dict(y=-1)))
             for processed_element in processed_elements:
-                # remove dependency to predecessor because successor element is either already added
+                # remove dependency to predecessors because successor element is either already added
                 # to render_elements or on new page
                 for successor in processed_element.successors:
-                    successor.predecessor = None
+                    successor.clear_predecessors()
         return len(self.sorted_elements) == 0
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc, cleanup=False):
@@ -150,7 +157,7 @@ class Container(object):
                 render_elem.cleanup()
         self.render_elements = self.render_elements[counter:]
 
-    def render_spreadsheet(self, row, col, ctx, workbook, worksheet):
+    def render_spreadsheet(self, row, col, ctx, renderer):
         max_col = col
         i = 0
         count = len(self.sorted_elements)
@@ -169,7 +176,8 @@ class Container(object):
             current_row = row
             current_col = col
             for row_element in row_elements:
-                tmp_row, current_col = row_element.render_spreadsheet(current_row, current_col, ctx, workbook, worksheet)
+                tmp_row, current_col = row_element.render_spreadsheet(
+                    current_row, current_col, ctx, renderer)
                 row = max(row, tmp_row)
                 if current_col > max_col:
                     max_col = current_col
@@ -189,29 +197,6 @@ class Frame(Container):
         self.width = width
         self.height = height
         self.allow_page_break = False
-
-
-# custom band inside content band
-class Band(Container):
-    def __init__(self, width, height, container_id, containers, report):
-        Container.__init__(self, container_id, containers, report)
-        self.width = width
-        self.height = height
-        self.render_elements = []
-        self.reset_render_elements = False
-
-    def reset_first_element_offset_y(self):
-        self.first_element_offset_y = 0
-
-    def inc_first_element_offset_y(self, val):
-        self.first_element_offset_y += val
-
-    def get_used_band_height(self):
-        height = 0
-        for elem in self.render_elements:
-            if elem.render_bottom > height:
-                height = elem.render_bottom
-        return height - self.first_element_offset_y
 
 
 class ReportBand(Container):

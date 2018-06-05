@@ -27,7 +27,8 @@ class DocElementType(Enum):
     table_text = 7
     bar_code = 8
     frame = 9
-    band = 10
+    section = 10
+    section_band = 11
 
 
 class ParameterType(Enum):
