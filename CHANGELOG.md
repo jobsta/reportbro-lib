@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0] - 2018-09-25
+## [1.0.0] - 2018-09-25
 
 ### Bug Fixes
 * fix rendering of frame element inside section
