@@ -23,8 +23,7 @@ setup(
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        #'Development Status :: 5 - Production/Stable',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'License :: OSI Approved :: GNU Affero General Public License v3',
@@ -42,7 +41,7 @@ setup(
     install_requires=[
         'Babel>=2.0',
         'enum34',
-        'reportbro-fpdf>=1.7.5',
+        'reportbro-fpdf>=1.7.8',
         'Pillow>=4.0',
         'simpleeval',
         'typing',

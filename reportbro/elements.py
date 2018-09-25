@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
-from io import BytesIO
+from io import BytesIO, BufferedReader
 from typing import List
 import base64
 import datetime
@@ -16,12 +16,17 @@ from .context import Context
 from .enums import *
 from .errors import Error, ReportBroError
 from .structs import Color, BorderStyle, TextStyle
-from .utils import get_float_value, get_int_value, to_string
+from .utils import get_float_value, get_int_value, to_string, PY2
 
 try:
     from urllib.request import urlopen  # For Python 3.0 and later
 except ImportError:
     from urllib2 import urlopen  # Fall back to Python 2's urllib2
+
+try:
+    basestring  # For Python 2, str and unicode
+except NameError:
+    basestring = str
 
 
 class DocElementBase(object):
@@ -178,11 +183,12 @@ class ImageElement(DocElement):
                     # file object (only possible if report data is passed directly from python code
                     # and not via web request)
                     img_data, parameter_exists = ctx.get_data(source_parameter.name)
-                    if isinstance(img_data, file):
+                    if isinstance(img_data, BufferedReader) or\
+                            (PY2 and isinstance(img_data, file)):
                         self.image_fp = img_data
                         pos = img_data.name.rfind('.')
                         self.image_type = img_data.name[pos+1:] if pos != -1 else ''
-                    elif isinstance(img_data, (str, unicode)):
+                    elif isinstance(img_data, basestring):
                         img_data_b64 = img_data
                 else:
                     raise ReportBroError(
@@ -424,6 +430,8 @@ class TextElement(DocElement):
                 not isinstance(self, TableTextElement):
             self.always_print_on_same_page = True
         available_width = self.width - self.used_style.padding_left - self.used_style.padding_right
+
+        self.text_lines = []
         if pdf_doc:
             pdf_doc.set_font(self.used_style.font, self.used_style.font_style, self.used_style.font_size,
                     underline=self.used_style.underline)
@@ -439,7 +447,6 @@ class TextElement(DocElement):
             self.lines_count = len(lines)
             if self.lines_count > 0:
                 self.text_height = (len(lines) - 1) * self.line_height + self.used_style.font_size
-            self.text_lines = []
             self.line_index = 0
             for line in lines:
                 self.text_lines.append(TextLine(line, width=available_width, style=self.used_style))
@@ -450,6 +457,9 @@ class TextElement(DocElement):
                 self.set_height(self.height)
         else:
             self.content = content
+            # set text_lines so is_printed can check for empty element when rendering spreadsheet
+            if content:
+                self.text_lines = [content]
 
     def set_height(self, height):
         self.height = height
@@ -1164,6 +1174,67 @@ class TableBandElement(object):
         assert isinstance(self.column_data, list)
 
 
+class FrameBlockElement(DocElementBase):
+    def __init__(self, report, frame, render_y):
+        DocElementBase.__init__(self, report, dict(y=0))
+        self.report = report
+        self.x = frame.x
+        self.width = frame.width
+        self.border_style = frame.border_style
+        self.background_color = frame.background_color
+        self.render_y = render_y
+        self.render_bottom = render_y
+        self.height = 0
+        self.elements = []
+        self.render_element_type = RenderElementType.none
+        self.complete = False
+
+    def add_elements(self, container, render_element_type, height):
+        self.elements = list(container.render_elements)
+        self.render_element_type = render_element_type
+        self.render_bottom += height
+
+    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
+        x = self.x + container_offset_x
+        y = self.render_y + container_offset_y
+        height = self.render_bottom - self.render_y
+
+        content_x = x
+        content_width = self.width
+        content_y = y
+        content_height = height
+
+        if self.border_style.border_left:
+            content_x += self.border_style.border_width
+            content_width -= self.border_style.border_width
+        if self.border_style.border_right:
+            content_width -= self.border_style.border_width
+        if self.border_style.border_top and\
+                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
+            content_y += self.border_style.border_width
+            content_height -= self.border_style.border_width
+        if self.border_style.border_bottom and\
+                self.render_element_type in (RenderElementType.last, RenderElementType.complete):
+            content_height -= self.border_style.border_width
+
+        if not self.background_color.transparent:
+            pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
+            pdf_doc.rect(content_x, content_y, content_width, content_height, style='F')
+
+        render_y = y
+        if self.border_style.border_top and\
+                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
+            render_y += self.border_style.border_width
+        for element in self.elements:
+            element.render_pdf(container_offset_x=content_x, container_offset_y=content_y, pdf_doc=pdf_doc)
+
+        if (self.border_style.border_left or self.border_style.border_top or
+                self.border_style.border_right or self.border_style.border_bottom):
+            DocElement.draw_border(
+                x=x, y=y, width=self.width, height=height,
+                render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)
+
+
 class FrameElement(DocElement):
     def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
@@ -1199,10 +1270,15 @@ class FrameElement(DocElement):
 
     def prepare(self, ctx, pdf_doc, only_verify):
         self.container.prepare(ctx, pdf_doc=pdf_doc, only_verify=only_verify)
+        self.next_page_rendering_complete = False
+        self.prev_page_content_height = 0
+        self.render_element_type = RenderElementType.none
 
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         content_height = container_height
+        render_element = FrameBlockElement(self.report, self, render_y=offset_y)
+
         if self.border_style.border_top and self.render_element_type == RenderElementType.none:
             content_height -= self.border_style.border_width
         if self.border_style.border_bottom:
@@ -1225,14 +1301,16 @@ class FrameElement(DocElement):
                 self.rendering_complete = True
                 self.render_bottom = offset_y + needed_height
                 self.render_element_type = RenderElementType.complete
-                return self, True
+                render_element.add_elements(self.container, self.render_element_type, needed_height)
+                return render_element, True
             else:
                 if offset_y == 0:
                     # rendering of frame elements does not fit on current page but
                     # we are already at the top of the page -> start rendering and continue on next page
                     self.render_bottom = offset_y + available_height
                     self.render_element_type = RenderElementType.first
-                    return self, False
+                    render_element.add_elements(self.container, self.render_element_type, available_height)
+                    return render_element, False
                 else:
                     # rendering of frame elements does not fit on current page -> start rendering on next page
                     self.next_page_rendering_complete = rendering_complete
@@ -1248,7 +1326,6 @@ class FrameElement(DocElement):
                 # the previously created elements
 
                 self.rendering_complete = self.next_page_rendering_complete
-                self.render_bottom = offset_y + self.get_used_height()
             else:
                 # we cannot use previously created render elements because container height is different
                 # on current page. this should be very unlikely but could happen when the frame should be
@@ -1257,10 +1334,9 @@ class FrameElement(DocElement):
 
                 self.container.prepare(ctx, pdf_doc=pdf_doc)
                 self.rendering_complete = self.container.create_render_elements(content_height, ctx, pdf_doc)
-                self.render_bottom = offset_y + self.get_used_height()
         else:
             self.rendering_complete = self.container.create_render_elements(content_height, ctx, pdf_doc)
-            self.render_bottom = offset_y + self.get_used_height()
+        self.render_bottom = offset_y + self.get_used_height()
 
         if not self.rendering_complete:
             # use whole size of container if frame is not rendered completely
@@ -1275,45 +1351,8 @@ class FrameElement(DocElement):
                 self.render_element_type = RenderElementType.complete
             else:
                 self.render_element_type = RenderElementType.last
-        return self, self.rendering_complete
-
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y
-        height = self.render_bottom - self.render_y
-        content_x = x
-        content_width = self.width
-        content_y = y
-        content_height = height
-
-        if self.border_style.border_left:
-            content_x += self.border_style.border_width
-            content_width -= self.border_style.border_width
-        if self.border_style.border_right:
-            content_width -= self.border_style.border_width
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            content_y += self.border_style.border_width
-            content_height -= self.border_style.border_width
-        if self.border_style.border_bottom and\
-                self.render_element_type in (RenderElementType.last, RenderElementType.complete):
-            content_height -= self.border_style.border_width
-
-        if not self.background_color.transparent:
-            pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
-            pdf_doc.rect(content_x, content_y, content_width, content_height, style='F')
-
-        render_y = y
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            render_y += self.border_style.border_width
-        self.container.render_pdf(container_offset_x=content_x, container_offset_y=content_y, pdf_doc=pdf_doc)
-
-        if (self.border_style.border_left or self.border_style.border_top or
-                self.border_style.border_right or self.border_style.border_bottom):
-            DocElement.draw_border(
-                x=x, y=y, width=self.width, height=height,
-                render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)
+        render_element.add_elements(self.container, self.render_element_type, self.get_used_height())
+        return render_element, self.rendering_complete
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.spreadsheet_column:

@@ -22,7 +22,7 @@ class Context:
         self.eval_functions = EVAL_DEFAULT_FUNCTIONS.copy()
         self.eval_functions.update(
             len=len,
-            float=float
+            decimal=decimal.Decimal
         )
         self.root_data = data
         self.root_data['page_number'] = 0
@@ -131,16 +131,17 @@ class Context:
                     Error('errorMsgInvalidExpressionNameNotDefined',
                           object_id=object_id, field=field, info=ex.name, context=expr))
             except FunctionNotDefined as ex:
+                # avoid possible unresolved attribute reference warning by using getattr
+                func_name = getattr(ex, 'func_name')
                 raise ReportBroError(
                     Error('errorMsgInvalidExpressionFuncNotDefined',
-                          object_id=object_id, field=field, info=ex.func_name, context=expr))
+                          object_id=object_id, field=field, info=func_name, context=expr))
             except SyntaxError as ex:
                 raise ReportBroError(
                     Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=ex.msg, context=expr))
             except Exception as ex:
-                info = ex.message if isinstance(ex.message, str) else 'error'
                 raise ReportBroError(
-                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=info, context=expr))
+                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=str(ex), context=expr))
         return True
 
     @staticmethod
@@ -220,8 +221,6 @@ class Context:
                         parameter_name = collection_name + '_' + field_name
                     else:
                         value, parameter_exists = self.get_data(parameter_name)
-                    if isinstance(value, decimal.Decimal):
-                        value = float(value)
                     data[parameter_name] = value
                 ret += parameter_name
                 pos2 += 1

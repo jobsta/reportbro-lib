@@ -1,3 +1,3 @@
-__version__ = "0.12.1"
+__version__ = "1.0.0"
 
 from .reportbro import Report, ReportBroError

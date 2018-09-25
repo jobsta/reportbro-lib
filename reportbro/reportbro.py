@@ -1,21 +1,17 @@
 #
-# Copyright (C) 2017-2018 jobsta
+# Copyright (C) 2018 jobsta
 #
-# This file is part of ReportBro, is a library to generate PDF and Excel reports.
-# Demos can be found at https://www.reportbro.com.
+# This file is part of ReportBro, a library to generate PDF and Excel reports.
+# Demos can be found at https://www.reportbro.com
 #
-# ReportBro is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# ReportBro is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
+# Dual licensed under AGPLv3 and ReportBro commercial license:
+# https://www.reportbro.com/license
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see https://www.gnu.org/licenses/
+#
+# Details for ReportBro commercial license can be found at
+# https://www.reportbro.com/license/agreement
 #
 
 from __future__ import unicode_literals
@@ -29,13 +25,16 @@ from .containers import ReportBand
 from .elements import *
 from .enums import *
 from .structs import Parameter, TextStyle
-from .utils import get_int_value
+from .utils import get_int_value, PY3
 
 
 try:
     basestring  # For Python 2, str and unicode
 except NameError:
     basestring = str
+
+if PY3:
+    long = int
 
 regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
 
@@ -352,7 +351,7 @@ class Report:
 
         self.parameters = dict()
         self.styles = dict()
-        self.data = data
+        self.data = dict()
         self.is_test_data = is_test_data
 
         self.additional_fonts = additional_fonts
@@ -415,10 +414,11 @@ class Report:
                         self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='position'))
                 container.add(elem)
 
-        self.context = Context(self, self.parameters, data)
+        self.context = Context(self, self.parameters, self.data)
 
         computed_parameters = []
-        self.process_data(self.data, parameter_list, is_test_data, computed_parameters, parents=[])
+        self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
+                          is_test_data=is_test_data, computed_parameters=computed_parameters, parents=[])
         try:
             if not self.errors:
                 self.compute_parameters(computed_parameters, self.data)
@@ -525,7 +525,7 @@ class Report:
                 value = datetime.datetime.now()
         return value
 
-    def process_data(self, data, parameters, is_test_data, computed_parameters, parents):
+    def process_data(self, dest_data, src_data, parameters, is_test_data, computed_parameters, parents):
         field = 'test_data' if is_test_data else 'type'
         parent_id = parents[-1].id if parents else None
         for parameter in parameters:
@@ -545,7 +545,7 @@ class Report:
                         parent_names.append(parent.name)
                     computed_parameters.append(dict(parameter=parameter, parent_names=parent_names))
             else:
-                value = data.get(parameter.name)
+                value = src_data.get(parameter.name)
                 if parameter_type in (ParameterType.string, ParameterType.number,
                                       ParameterType.boolean, ParameterType.date):
                     value = self.parse_parameter_value(parameter, parent_id, is_test_data, parameter_type, value)
@@ -554,10 +554,18 @@ class Report:
                         if isinstance(value, list):
                             parents.append(parameter)
                             parameter_list = list(parameter.fields.values())
+                            # create new list which will be assigned to dest_data to keep src_data unmodified
+                            dest_array = []
+
                             for row in value:
-                                self.process_data(row, parameter_list, is_test_data, computed_parameters,
+                                dest_array_item = dict()
+                                self.process_data(
+                                    dest_data=dest_array_item, src_data=row, parameters=parameter_list,
+                                    is_test_data=is_test_data, computed_parameters=computed_parameters,
                                     parents=parents)
+                                dest_array.append(dest_array_item)
                             parents = parents[:-1]
+                            value = dest_array
                         elif value is None:
                             if not parameter.nullable:
                                 value = []
@@ -584,16 +592,22 @@ class Report:
                         if isinstance(value, dict):
                             if isinstance(parameter.children, list):
                                 parents.append(parameter)
-                                self.process_data(value, parameter.children, is_test_data, computed_parameters,
+                                # create new dict which will be assigned to dest_data to keep src_data unmodified
+                                dest_map = dict()
+
+                                self.process_data(
+                                    dest_data=dest_map, src_data=value, parameters=parameter.children,
+                                    is_test_data=is_test_data, computed_parameters=computed_parameters,
                                     parents=parents)
                                 parents = parents[:-1]
+                                value = dest_map
                             else:
                                 self.errors.append(Error('errorMsgInvalidMap',
                                                          object_id=parameter.id, field='type', context=parameter.name))
                         else:
                             self.errors.append(Error('errorMsgMissingData',
                                                      object_id=parameter.id, field='name', context=parameter.name))
-                data[parameter.name] = value
+                dest_data[parameter.name] = value
 
     def compute_parameters(self, computed_parameters, data):
         for computed_parameter in computed_parameters:

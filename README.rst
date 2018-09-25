@@ -3,7 +3,7 @@ ReportBro Lib
 
 ReportBro is a library to generate PDF and XLSX reports. Report templates can be created 
 with `ReportBro Designer <https://github.com/jobsta/reportbro-designer>`_,
-a Javascript Plugin that can be integrated in your web application.
+a Javascript Plugin which can be integrated in your web application.
 
 See the ReportBro project website on https://www.reportbro.com for full documentation and demos.
 

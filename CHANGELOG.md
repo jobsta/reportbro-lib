@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0] - 2018-09-25
+
+### Bug Fixes
+* fix rendering of frame element inside section
+* fix Python 3 compatability issues
+* do not convert decimal values to float when evaluating expressions to avoid rounding issues
+* fix handling errors when evaluating parameter expression
+* check "Print if" condition before rendering element in spreadsheet
+
+### Changes
+* do not modify data parameter which is passed to ReportBro constructor
+* add decimal to default functions in expression evaluation (allows to create a decimal.Decimal instance
+in an expression)
+
 ## [0.12.1] - 2018-06-06
 
 ### Features

@@ -163,24 +163,29 @@ class Container(object):
         count = len(self.sorted_elements)
         while i < count:
             elem = self.sorted_elements[i]
-            j = i + 1
-            row_elements = [elem]
-            while j < count:
-                elem2 = self.sorted_elements[j]
-                if elem2.y == elem.y:
-                    row_elements.append(elem2)
-                else:
-                    break
-                j += 1
-            i = j
-            current_row = row
-            current_col = col
-            for row_element in row_elements:
-                tmp_row, current_col = row_element.render_spreadsheet(
-                    current_row, current_col, ctx, renderer)
-                row = max(row, tmp_row)
-                if current_col > max_col:
-                    max_col = current_col
+            if elem.is_printed(ctx):
+                j = i + 1
+                # render elements with same y-coordinate in same spreadsheet row
+                row_elements = [elem]
+                while j < count:
+                    elem2 = self.sorted_elements[j]
+                    if elem2.y == elem.y:
+                        if elem2.is_printed(ctx):
+                            row_elements.append(elem2)
+                    else:
+                        break
+                    j += 1
+                i = j
+                current_row = row
+                current_col = col
+                for row_element in row_elements:
+                    tmp_row, current_col = row_element.render_spreadsheet(
+                        current_row, current_col, ctx, renderer)
+                    row = max(row, tmp_row)
+                    if current_col > max_col:
+                        max_col = current_col
+            else:
+                i += 1
         return row, max_col
 
     def is_finished(self):
