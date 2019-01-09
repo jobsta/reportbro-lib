@@ -5,6 +5,7 @@ from babel.dates import format_datetime
 from simpleeval import simple_eval, NameNotDefined, FunctionNotDefined
 from simpleeval import DEFAULT_NAMES as EVAL_DEFAULT_NAMES
 from simpleeval import DEFAULT_FUNCTIONS as EVAL_DEFAULT_FUNCTIONS
+import datetime
 import decimal
 
 from .enums import *
@@ -22,7 +23,8 @@ class Context:
         self.eval_functions = EVAL_DEFAULT_FUNCTIONS.copy()
         self.eval_functions.update(
             len=len,
-            decimal=decimal.Decimal
+            decimal=decimal.Decimal,
+            datetime=datetime
         )
         self.root_data = data
         self.root_data['page_number'] = 0
@@ -123,7 +125,7 @@ class Context:
     def evaluate_expression(self, expr, object_id, field):
         if expr:
             try:
-                data = dict()
+                data = dict(EVAL_DEFAULT_NAMES)
                 expr = self.replace_parameters(expr, data=data)
                 return simple_eval(expr, names=data, functions=self.eval_functions)
             except NameNotDefined as ex:
@@ -140,8 +142,9 @@ class Context:
                 raise ReportBroError(
                     Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=ex.msg, context=expr))
             except Exception as ex:
+                info = ex.message if hasattr(ex, 'message') else str(ex)
                 raise ReportBroError(
-                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=str(ex), context=expr))
+                    Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=info, context=expr))
         return True
 
     @staticmethod
