@@ -160,6 +160,7 @@ class ImageElement(DocElement):
         self.background_color = Color(data.get('backgroundColor'))
         self.print_if = data.get('printIf', '')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
+        self.link = data.get('link', '')
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
@@ -231,6 +232,9 @@ class ImageElement(DocElement):
                 self.image_key = 'image_' + str(self.id) + '.' + self.image_type
         self.image = None
 
+        if self.link:
+            self.link = ctx.fill_parameters(self.link, self.id, field='link')
+
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
         y = self.render_y + container_offset_y
@@ -242,8 +246,41 @@ class ImageElement(DocElement):
                     HorizontalAlignment.right: 'R'}.get(self.horizontal_alignment)
             valign = {VerticalAlignment.top: 'T', VerticalAlignment.middle: 'C',
                     VerticalAlignment.bottom: 'B'}.get(self.vertical_alignment)
-            pdf_doc.image(self.image_key, x, y, self.width, self.height, type=self.image_type,
+            try:
+                image_info = pdf_doc.image(
+                    self.image_key, x, y, self.width, self.height, type=self.image_type,
                     image_fp=self.image_fp, halign=halign, valign=valign)
+            except:
+                raise ReportBroError(
+                    Error('errorMsgLoadingImageFailed', object_id=self.id,
+                          field='source' if self.source else 'image'))
+
+            if self.link:
+                # horizontal and vertical alignment of image within given width and height
+                # by keeping original image aspect ratio
+                offset_x = offset_y = 0
+                image_width, image_height = image_info['w'], image_info['h']
+                if image_width <= self.width and image_height <= self.height:
+                    image_display_width, image_display_height = image_width, image_height
+                else:
+                    size_ratio = image_width / image_height
+                    tmp = self.width / size_ratio
+                    if tmp <= self.height:
+                        image_display_width = self.width
+                        image_display_height = tmp
+                    else:
+                        image_display_width = self.height * size_ratio
+                        image_display_height = self.height
+                if self.horizontal_alignment == HorizontalAlignment.center:
+                    offset_x = (self.width - image_display_width) / 2
+                elif self.horizontal_alignment == HorizontalAlignment.right:
+                    offset_x = self.width - image_display_width
+                if self.vertical_alignment == VerticalAlignment.middle:
+                    offset_y = (self.height - image_display_height) / 2
+                elif self.vertical_alignment == VerticalAlignment.bottom:
+                    offset_y = self.height - image_display_height
+
+                pdf_doc.link(x + offset_x, y + offset_y, image_display_width, image_display_height, self.link)
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.image_key:
@@ -360,6 +397,7 @@ class TextElement(DocElement):
             self.style = TextStyle(data)
         self.print_if = data.get('printIf', '')
         self.pattern = data.get('pattern', '')
+        self.link = data.get('link', '')
         self.cs_condition = data.get('cs_condition')
         if self.cs_condition:
             if data.get('cs_styleId'):
@@ -419,6 +457,10 @@ class TextElement(DocElement):
             content = to_string(content)
         else:
             content = ctx.fill_parameters(self.content, self.id, field='content', pattern=self.pattern)
+
+        if self.link:
+            self.link = ctx.fill_parameters(self.link, self.id, field='link')
+
         if self.cs_condition:
             if ctx.evaluate_expression(self.cs_condition, self.id, field='cs_condition'):
                 self.used_style = self.conditional_style
@@ -449,7 +491,7 @@ class TextElement(DocElement):
                 self.text_height = (len(lines) - 1) * self.line_height + self.used_style.font_size
             self.line_index = 0
             for line in lines:
-                self.text_lines.append(TextLine(line, width=available_width, style=self.used_style))
+                self.text_lines.append(TextLine(line, width=available_width, style=self.used_style, link=self.link))
             if isinstance(self, TableTextElement):
                 self.total_height = max(self.text_height +\
                         self.used_style.padding_top + self.used_style.padding_bottom, self.height)
@@ -575,6 +617,8 @@ class TextElement(DocElement):
                 format_props['italic'] = True
             if self.used_style.underline:
                 format_props['underline'] = True
+            if self.used_style.strikethrough:
+                format_props['font_strikeout'] = True
             if self.used_style.horizontal_alignment != HorizontalAlignment.left:
                 format_props['align'] = self.used_style.horizontal_alignment.name
             if self.used_style.vertical_alignment != VerticalAlignment.top:
@@ -647,30 +691,38 @@ class TextBlockElement(DocElementBase):
 
         underline = self.style.underline
         last_line_index = len(self.lines) - 1
+        # underline for justified text is drawn manually to have a single line for the
+        # whole text. each word is rendered individually,
+        # therefor we can't use the underline style of the rendered text
         if self.style.horizontal_alignment == HorizontalAlignment.justify and last_line_index > 0:
             underline = False
+            pdf_doc.set_draw_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
         pdf_doc.set_font(self.style.font, self.style.font_style, self.style.font_size, underline=underline)
         pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
 
         for i, line in enumerate(self.lines):
             last_line = (i == last_line_index)
-            line.render_pdf(self.x + container_offset_x + self.style.padding_left, y, last_line=last_line, pdf_doc=pdf_doc)
+            line.render_pdf(self.x + container_offset_x + self.style.padding_left, y,
+                            last_line=last_line, pdf_doc=pdf_doc)
             y += self.line_height
 
 
 class TextLine(object):
-    def __init__(self, text, width, style):
+    def __init__(self, text, width, style, link):
         self.text = text
         self.width = width
         self.style = style
+        self.link = link
 
     def render_pdf(self, x, y, last_line, pdf_doc):
-        y += self.style.font_size * 0.8
+        render_y = y + self.style.font_size * 0.8
+        line_width = None
+        offset_x = 0
         if self.style.horizontal_alignment == HorizontalAlignment.justify:
             if last_line:
-                pdf_doc.set_font(self.style.font, self.style.font_style, self.style.font_size,
-                        underline=self.style.underline)
-                pdf_doc.text(x, y, self.text)
+                pdf_doc.set_font(
+                    self.style.font, self.style.font_style, self.style.font_size, underline=self.style.underline)
+                pdf_doc.text(x, render_y, self.text)
             else:
                 words = self.text.split()
                 word_width = []
@@ -684,8 +736,9 @@ class TextLine(object):
                 word_x = x
                 pdf_doc.set_font(self.style.font, self.style.font_style, self.style.font_size, underline=False)
                 for i, word in enumerate(words):
-                    pdf_doc.text(word_x, y, word)
+                    pdf_doc.text(word_x, render_y, word)
                     word_x += word_width[i] + word_spacing
+
                 if self.style.underline:
                     if len(words) == 1:
                         text_width = word_width[0]
@@ -693,12 +746,16 @@ class TextLine(object):
                         text_width = self.width
                     underline_position = pdf_doc.current_font['up']
                     underline_thickness = pdf_doc.current_font['ut']
-                    y += -underline_position / 1000.0 * self.style.font_size
-                    line_width = underline_thickness / 1000.0 * self.style.font_size
-                    pdf_doc.set_line_width(line_width)
-                    pdf_doc.line(x, y, x + text_width, y)
+                    render_y += -underline_position / 1000.0 * self.style.font_size
+                    underline_width = underline_thickness / 1000.0 * self.style.font_size
+                    pdf_doc.set_line_width(underline_width)
+                    pdf_doc.line(x, render_y, x + text_width, render_y)
+
+                if len(words) > 1:
+                    line_width = self.width
+                elif len(words) > 0:
+                    line_width = word_width[0]
         else:
-            offset_x = 0
             if self.style.horizontal_alignment != HorizontalAlignment.left:
                 line_width = pdf_doc.get_string_width(self.text)
                 space = self.width - line_width
@@ -706,7 +763,22 @@ class TextLine(object):
                     offset_x = (space / 2)
                 elif self.style.horizontal_alignment == HorizontalAlignment.right:
                     offset_x = space
-            pdf_doc.text(x + offset_x, y, self.text)
+            pdf_doc.text(x + offset_x, render_y, self.text)
+
+        if self.style.strikethrough:
+            if line_width is None:
+                line_width = pdf_doc.get_string_width(self.text)
+            # use underline thickness
+            strikethrough_thickness = pdf_doc.current_font['ut']
+            render_y = y + self.style.font_size * 0.5
+            strikethrough_width = strikethrough_thickness / 1000.0 * self.style.font_size
+            pdf_doc.set_line_width(strikethrough_width)
+            pdf_doc.line(x + offset_x, render_y, x + offset_x + line_width, render_y)
+
+        if self.link:
+            if line_width is None:
+                line_width = pdf_doc.get_string_width(self.text)
+            pdf_doc.link(x + offset_x, y, line_width, self.style.font_size, self.link)
 
 
 class TableTextElement(TextElement):
@@ -831,12 +903,13 @@ class TableRow(object):
 
 
 class TableBlockElement(DocElementBase):
-    def __init__(self, report, x, width, table):
+    def __init__(self, report, x, width, render_y, table):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
         self.x = x
         self.width = width
-        self.height = 0
+        self.render_y = render_y
+        self.render_bottom = render_y
         self.table = table
         self.rows = []
         self.complete = False
@@ -856,6 +929,7 @@ class TableBlockElement(DocElementBase):
                     rows_added = len(rows)
                     available_height -= height
                     self.height += height
+                    self.render_bottom += height
                 else:
                     self.complete = True
             else:
@@ -867,6 +941,7 @@ class TableBlockElement(DocElementBase):
                         rows_added += 1
                         available_height -= row.height
                         self.height += row.height
+                        self.render_bottom += row.height
                     else:
                         self.complete = True
                         break
@@ -935,6 +1010,8 @@ class TableElement(DocElement):
         self.border = Border[data.get('border')]
         self.border_color = Color(data.get('borderColor'))
         self.border_width = get_float_value(data, 'borderWidth')
+        self.print_if = data.get('printIf', '')
+        self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
@@ -946,16 +1023,16 @@ class TableElement(DocElement):
         self.prepared_rows = []  # type: List[TableRow]
         self.prev_content_rows = [None] * len(self.content_rows)  # type: List[TableRow]
         self.width = 0
-        self.bottom = self.y
         if self.header:
-            self.bottom += self.header.height
+            self.height += self.header.height
         if self.footer:
-            self.bottom += self.footer.height
+            self.height += self.footer.height
         if len(self.content_rows) > 0:
             for content_row in self.content_rows:
-                 self.bottom += content_row.height
+                self.height += content_row.height
             for column in self.content_rows[0].column_data:
                 self.width += column.get('width', 0)
+        self.bottom = self.y + self.height
         self.first_render_element = True
 
     def prepare(self, ctx, pdf_doc, only_verify):
@@ -966,22 +1043,27 @@ class TableElement(DocElement):
                     if not printed:
                         del self.columns[column_idx]
         parameter_name = Context.strip_parameter_name(self.data_source)
-        self.data_source_parameter = ctx.get_parameter(parameter_name)
-        if not self.data_source_parameter:
-            raise ReportBroError(
-                Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='data_source'))
-        if self.data_source_parameter.type != ParameterType.array:
-            raise ReportBroError(
-                Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
-        for row_parameter in self.data_source_parameter.children:
-            self.row_parameters[row_parameter.name] = row_parameter
-        self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
-        if not parameter_exists:
-            raise ReportBroError(
-                Error('errorMsgMissingData', object_id=self.id, field='data_source'))
-        if not isinstance(self.rows, list):
-            raise ReportBroError(
-                Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
+        self.data_source_parameter = None
+        if parameter_name:
+            self.data_source_parameter = ctx.get_parameter(parameter_name)
+            if self.data_source_parameter is None:
+                raise ReportBroError(
+                    Error('errorMsgMissingParameter', object_id=self.id, field='data_source'))
+            if self.data_source_parameter.type != ParameterType.array:
+                raise ReportBroError(
+                    Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
+            for row_parameter in self.data_source_parameter.children:
+                self.row_parameters[row_parameter.name] = row_parameter
+            self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
+            if not parameter_exists:
+                raise ReportBroError(
+                    Error('errorMsgMissingData', object_id=self.id, field='data_source'))
+            if not isinstance(self.rows, list):
+                raise ReportBroError(
+                    Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
+        else:
+            # there is no data source parameter so we create a static table (faked by one empty data row)
+            self.rows = [dict()]
 
         self.row_count = len(self.rows)
         self.row_index = 0
@@ -1008,7 +1090,7 @@ class TableElement(DocElement):
         if self.is_rendering_complete():
             self.rendering_complete = True
             return None, True
-        render_element = TableBlockElement(self.report, self.x, self.width, self)
+        render_element = TableBlockElement(self.report, self.x, self.width, offset_y, self)
 
         # batch size can be anything >= 3 because each row needs previous and next row to evaluate
         # group expression (in case it is set), the batch size defines the number of table rows
@@ -1053,12 +1135,14 @@ class TableElement(DocElement):
 
         self.update_render_element(render_element, offset_y, container_height, ctx, pdf_doc)
 
-        if render_element.is_empty():
-            return None, False
-        self.render_bottom += render_element.height
-        self.first_render_element = False
         if self.is_rendering_complete():
             self.rendering_complete = True
+
+        if render_element.is_empty():
+            return None, self.rendering_complete
+
+        self.render_bottom = render_element.render_bottom
+        self.first_render_element = False
         return render_element, self.rendering_complete
 
     def update_render_element(self, render_element, offset_y, container_height, ctx, pdf_doc):

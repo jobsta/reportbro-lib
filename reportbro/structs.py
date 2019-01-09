@@ -37,7 +37,6 @@ class Parameter:
         self.expression = data.get('expression', '')
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = (self.pattern.find('$') != -1)
-        self.test_data = data.get('test_data', '') if not self.eval else None
         self.is_internal = self.name in ('page_count', 'page_number')
         self.children = []
         self.fields = dict()
@@ -69,6 +68,7 @@ class TextStyle(BorderStyle):
         self.bold = bool(data.get(key_prefix + 'bold'))
         self.italic = bool(data.get(key_prefix + 'italic'))
         self.underline = bool(data.get(key_prefix + 'underline'))
+        self.strikethrough = bool(data.get(key_prefix + 'strikethrough'))
         self.horizontal_alignment = HorizontalAlignment[data.get(key_prefix + 'horizontalAlignment')]
         self.vertical_alignment = VerticalAlignment[data.get(key_prefix + 'verticalAlignment')]
         self.text_color = Color(data.get(key_prefix + 'textColor'))
