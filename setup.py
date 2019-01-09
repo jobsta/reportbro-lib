@@ -13,7 +13,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 setup(
     name='reportbro-lib',
     version=__version__,
-    description='PDF and Excel report generation library',
+    description='Generate PDF and Excel reports from visually designed templates',
     long_description=long_description,
     url='https://www.reportbro.com',
 
@@ -35,13 +35,13 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
 
-    keywords='pdf excel report generation creation design',
+    keywords='pdf excel report generate create web template layout',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
 
     install_requires=[
         'Babel>=2.0',
         'enum34',
-        'reportbro-fpdf>=1.7.8',
+        'reportbro-fpdf>=1.7.9',
         'Pillow>=4.0',
         'simpleeval',
         'typing',

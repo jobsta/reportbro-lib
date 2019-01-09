@@ -1,10 +1,28 @@
 # Changelog
 
+## [1.1.0]
+
+### Feature
+* external links for text and image element with link property
+* strikethrough text style
+
+### Changes
+* allow static tables (table without data source)
+* support removeEmptyElement field for table
+* make datetime module available for expressions
+* show error message if loading image failed
+
+### Bug Fixes
+* set correct line color when justified text is underlined
+* fix rendering of table element inside frame
+* no page break after rendering table where no rows are printed because of print condition
+* define True/False for expression evaluation
+
 ## [1.0.0] - 2018-09-25
 
 ### Bug Fixes
 * fix rendering of frame element inside section
-* fix Python 3 compatability issues
+* fix Python 3 compatibility issues
 * do not convert decimal values to float when evaluating expressions to avoid rounding issues
 * fix handling errors when evaluating parameter expression
 * check "Print if" condition before rendering element in spreadsheet
