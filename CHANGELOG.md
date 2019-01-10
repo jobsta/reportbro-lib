@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0]
+## [1.1.0] - 2019-01-10
 
 ### Feature
 * external links for text and image element with link property
