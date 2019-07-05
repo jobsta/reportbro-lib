@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2019-07-05
+### Changes
+* reduce minimum page width/height (minimum is now 30)
+
+### Bug Fixes
+* include images and links in xls export
+
 ## [1.1.0] - 2019-01-10
 
 ### Feature
