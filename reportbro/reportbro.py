@@ -171,15 +171,23 @@ class DocumentXLSXRenderer:
         if width > self.column_widths[col]:
             self.column_widths[col] = width
 
-    def write(self, row, col, colspan, text, cell_format, width):
+    def write(self, row, col, colspan, text, cell_format, width, url=None):
         if colspan > 1:
             self.worksheet.merge_range(row, col, row, col + colspan - 1, text, cell_format)
-        else:
+        elif not url:
             self.worksheet.write(row, col, text, cell_format)
             self.update_column_width(col, width)
+        # url also works combined with colspan, the first cell of the range is simply overwritten
+        if url:
+            self.worksheet.write_url(row, col, url, cell_format, text)
 
-    def insert_image(self, row, col, image_filename, width):
-        self.worksheet.insert_image(row, col, image_filename)
+    def insert_image(self, row, col, image_filename, image_data, width, url=None):
+        options = dict()
+        if image_data:
+            options['image_data'] = image_data
+        if url:
+            options['url'] = url
+        self.worksheet.insert_image(row, col, image_filename, options)
         self.update_column_width(col, width)
 
     def add_format(self, format_props):
@@ -222,9 +230,9 @@ class DocumentProperties:
             self.page_height = get_int_value(data, 'pageHeight')
             unit = Unit[data.get('unit')]
             if unit == Unit.mm:
-                if self.page_width < 100 or self.page_width >= 100000:
+                if self.page_width < 30 or self.page_width >= 100000:
                     self.report.errors.append(Error('errorMsgInvalidPageSize', object_id=self.id, field='page'))
-                elif self.page_height < 100 or self.page_height >= 100000:
+                elif self.page_height < 30 or self.page_height >= 100000:
                     self.report.errors.append(Error('errorMsgInvalidPageSize', object_id=self.id, field='page'))
             elif unit == Unit.inch:
                 if self.page_width < 1 or self.page_width >= 1000:

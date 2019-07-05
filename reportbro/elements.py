@@ -8,6 +8,7 @@ import base64
 import datetime
 import decimal
 import os
+import PIL
 import re
 import tempfile
 
@@ -232,8 +233,14 @@ class ImageElement(DocElement):
                 self.image_key = 'image_' + str(self.id) + '.' + self.image_type
         self.image = None
 
+        if is_url:
+            self.image_fp = BytesIO(urlopen(self.image_key).read())
+
         if self.link:
             self.link = ctx.fill_parameters(self.link, self.id, field='link')
+            if not (self.link.startswith('http://') or self.link.startswith('https://')):
+                raise ReportBroError(
+                    Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
@@ -259,18 +266,8 @@ class ImageElement(DocElement):
                 # horizontal and vertical alignment of image within given width and height
                 # by keeping original image aspect ratio
                 offset_x = offset_y = 0
-                image_width, image_height = image_info['w'], image_info['h']
-                if image_width <= self.width and image_height <= self.height:
-                    image_display_width, image_display_height = image_width, image_height
-                else:
-                    size_ratio = image_width / image_height
-                    tmp = self.width / size_ratio
-                    if tmp <= self.height:
-                        image_display_width = self.width
-                        image_display_height = tmp
-                    else:
-                        image_display_width = self.height * size_ratio
-                        image_display_height = self.height
+                image_display_width, image_display_height = self.get_image_display_size(
+                    image_info['w'], image_info['h'])
                 if self.horizontal_alignment == HorizontalAlignment.center:
                     offset_x = (self.width - image_display_width) / 2
                 elif self.horizontal_alignment == HorizontalAlignment.right:
@@ -286,10 +283,41 @@ class ImageElement(DocElement):
         if self.image_key:
             if self.spreadsheet_column:
                 col = self.spreadsheet_column - 1
-            renderer.insert_image(row, col, self.image_key, self.width)
+
+            image = None
+            try:
+                image = PIL.Image.open(self.image_fp)
+            except:
+                raise ReportBroError(
+                    Error('errorMsgLoadingImageFailed', object_id=self.id,
+                          field='source' if self.source else 'image'))
+
+            image_display_width, image_display_height = self.get_image_display_size(image.width, image.height)
+            if image_display_width != image.width or image_display_height != image.height:
+                image = image.resize((int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
+                self.image_fp = BytesIO()
+                image.save(self.image_fp, format='PNG' if self.image_type.upper() == 'PNG' else 'JPEG')
+
+            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=self.image_fp,
+                                  width=self.width, url=self.link)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1
         return row, col
+
+    # return image size so image fits into configured width/height and keep aspect ratio
+    def get_image_display_size(self, image_width, image_height):
+        if image_width <= self.width and image_height <= self.height:
+            image_display_width, image_display_height = image_width, image_height
+        else:
+            size_ratio = image_width / image_height
+            tmp = self.width / size_ratio
+            if tmp <= self.height:
+                image_display_width = self.width
+                image_display_height = tmp
+            else:
+                image_display_width = self.height * size_ratio
+                image_display_height = self.height
+        return image_display_width, image_display_height
 
     def cleanup(self):
         if self.image_key:
@@ -460,6 +488,9 @@ class TextElement(DocElement):
 
         if self.link:
             self.link = ctx.fill_parameters(self.link, self.id, field='link')
+            if not (self.link.startswith('http://') or self.link.startswith('https://')):
+                raise ReportBroError(
+                    Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
         if self.cs_condition:
             if ctx.evaluate_expression(self.cs_condition, self.id, field='cs_condition'):
@@ -652,7 +683,7 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_cell_format
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width)
+        renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width, url=self.link)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + 1
