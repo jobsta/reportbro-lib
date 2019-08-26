@@ -37,7 +37,7 @@ class Parameter:
         self.expression = data.get('expression', '')
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = (self.pattern.find('$') != -1)
-        self.is_internal = self.name in ('page_count', 'page_number')
+        self.is_internal = self.name in ('page_count', 'page_number', 'row_number')
         self.children = []
         self.fields = dict()
         if self.type == ParameterType.array or self.type == ParameterType.map:

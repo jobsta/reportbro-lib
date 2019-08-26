@@ -815,15 +815,28 @@ class TextLine(object):
 class TableTextElement(TextElement):
     def __init__(self, report, data):
         TextElement.__init__(self, report, data)
+        self.colspan = get_int_value(data, 'colspan') if data.get('colspan') else 1
+        # overwrite spreadsheet colspan with table cell colspan (spreadsheet colspan
+        # cannot be set separately in a table cell)
+        self.spreadsheet_colspan = self.colspan
 
 
 class TableRow(object):
     def __init__(self, report, table_band, columns, ctx, prev_row=None):
         assert len(columns) <= len(table_band.column_data)
         self.column_data = []
-        for column in columns:
+        colspan_end_idx = 0
+        colspan_element = None
+        for idx, column in enumerate(columns):
             column_element = TableTextElement(report, table_band.column_data[column])
+            if idx < colspan_end_idx:
+                colspan_element.width += column_element.width
+                continue
+
             self.column_data.append(column_element)
+            if column_element.colspan > 1:
+                colspan_element = column_element
+                colspan_end_idx = idx + column_element.colspan
 
             if table_band.column_data[column].get('simple_array') != False:
                 # in case value of column is a simple array parameter we create multiple columns,
@@ -914,7 +927,7 @@ class TableRow(object):
     def render_spreadsheet(self, row, col, ctx, renderer):
         for column_element in self.column_data:
             column_element.render_spreadsheet(row, col, ctx, renderer)
-            col += 1
+            col += column_element.colspan
         return row + 1
 
     def verify(self, ctx):
@@ -1012,6 +1025,30 @@ class TableBlockElement(DocElementBase):
                 # add half border_width so border is drawn inside right column and can be aligned with
                 # borders of other elements outside the table
                 x = x1
+                y2 = y1 + self.rows[0].height
+                
+                # rows can have different columns (colspan) than other rows so
+                # we draw column borders separately if necessary
+                for row in self.rows[1:]:
+                    current_columns = row.column_data
+                    same_borders = True
+                    if len(columns) == len(current_columns):
+                        for (col1, col2) in zip(columns, current_columns):
+                            if col1.width != col2.width:
+                                same_borders = False
+                                break
+                    else:
+                        same_borders = False
+                    if not same_borders:
+                        x = x1
+                        for column in columns[:-1]:
+                            x += column.width
+                            pdf_doc.line(x, y1, x, y2)
+                        y1 = y2
+                        x = x1
+                        columns = current_columns
+                    y2 += row.height
+
                 for column in columns[:-1]:
                     x += column.width
                     pdf_doc.line(x, y1, x, y2)
@@ -1098,6 +1135,7 @@ class TableElement(DocElement):
 
         self.row_count = len(self.rows)
         self.row_index = 0
+        self.row_number = 0
 
         if only_verify:
             if self.print_header:
@@ -1139,6 +1177,8 @@ class TableElement(DocElement):
                 self.print_header = False
 
         while self.row_index < self.row_count:
+            self.row_number += 1
+            self.rows[self.row_index]['row_number'] = self.row_number
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
@@ -1623,6 +1663,7 @@ class SectionElement(DocElement):
         self.rows = []
         self.row_count = 0
         self.row_index = -1
+        self.row_number = 0
 
     def prepare(self, ctx, pdf_doc, only_verify):
         parameter_name = Context.strip_parameter_name(self.data_source)
@@ -1650,6 +1691,8 @@ class SectionElement(DocElement):
             if self.header:
                 self.header.prepare(ctx, pdf_doc=None, only_verify=True)
             while self.row_index < self.row_count:
+                self.row_number += 1
+                self.rows[self.row_index]['row_number'] = self.row_number
                 # push data context of current row so values of current row can be accessed
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
                 self.content.prepare(ctx, pdf_doc=None, only_verify=True)
@@ -1672,6 +1715,8 @@ class SectionElement(DocElement):
                 self.print_header = False
 
         while self.row_index < self.row_count:
+            self.row_number += 1
+            self.rows[self.row_index]['row_number'] = self.row_number
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
             self.content.create_render_elements(offset_y + render_element.height, container_height, ctx, pdf_doc)
