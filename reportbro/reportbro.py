@@ -638,7 +638,7 @@ class Report:
                         total = decimal.Decimal(0)
                         for item in items:
                             item_value = item.get(parameter_field)
-                            if item_value is None:
+                            if not isinstance(item_value, decimal.Decimal):
                                 self.errors.append(Error('errorMsgInvalidAvgSumExpression',
                                         object_id=parameter.id, field='expression', context=parameter.name))
                                 break
