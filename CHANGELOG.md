@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.0] - 2019-08-26
+
+### Features
+* support column span field for table text element
+* support internal parameter row_number for tables and sections
+
 ## [1.2.0] - 2019-07-05
 ### Changes
 * reduce minimum page width/height (minimum is now 30)
