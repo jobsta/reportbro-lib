@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 2019-09-02
+
+### Bug Fixes
+* fix rendering of images inside section
+* fix rendering of barcodes inside section
+* fix rendering of links (for texts and images) inside section
+* fix rendering sections in spreadsheet
+
 ## [1.3.0] - 2019-08-26
 
 ### Features
