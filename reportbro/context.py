@@ -26,6 +26,9 @@ class Context:
             decimal=decimal.Decimal,
             datetime=datetime
         )
+        # each new context (push_context) gets a new unique id
+        self.id = 1
+        self.data['__context_id'] = self.id
         self.root_data = data
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0
@@ -48,10 +51,24 @@ class Context:
             return self.get_data(name, data.get('__parent'))
         return None, False
 
+    # return context_id for given parameter. this can be useful to find out if a parameter value
+    # has changed, e.g. parameter 'amount' in a list of invoice items has a different context_id
+    # in each list row (invoice item).
+    def get_context_id(self, name, data=None):
+        if data is None:
+            data = self.data
+        if name in data:
+            return data['__context_id']
+        elif data.get('__parent'):
+            return self.get_context_id(name, data.get('__parent'))
+        return None
+
     def push_context(self, parameters, data):
         parameters['__parent'] = self.parameters
         self.parameters = parameters
         data['__parent'] = self.data
+        self.id += 1
+        data['__context_id'] = self.id
         self.data = data
 
     def pop_context(self):

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2018 jobsta
+# Copyright (C) 2017-2019 jobsta
 #
 # This file is part of ReportBro, a library to generate PDF and Excel reports.
 # Demos can be found at https://www.reportbro.com
@@ -16,10 +16,13 @@
 
 from __future__ import unicode_literals
 from __future__ import division
+import base64
 import fpdf
 import re
 import xlsxwriter
 import pkg_resources
+from io import BytesIO, BufferedReader
+import os
 
 from .containers import ReportBand
 from .elements import *
@@ -276,6 +279,71 @@ class DocumentProperties:
                 self.margin_top - self.margin_bottom
 
 
+class ImageData:
+    def __init__(self, ctx, image_id, source, image_file):
+        self.image_fp = None
+        self.image_type = None
+        image_url = None
+        img_data_b64 = None
+        if source:
+            if Context.is_parameter_name(source):
+                source_parameter = ctx.get_parameter(Context.strip_parameter_name(source))
+                if source_parameter:
+                    if source_parameter.type == ParameterType.string:
+                        image_url, _ = ctx.get_data(source_parameter.name)
+                    elif source_parameter.type == ParameterType.image:
+                        # image is available as base64 encoded or
+                        # file object (only possible if report data is passed directly from python code
+                        # and not via web request)
+                        img_data, _ = ctx.get_data(source_parameter.name)
+                        if isinstance(img_data, BufferedReader) or\
+                                (PY2 and isinstance(img_data, file)):
+                            self.image_fp = img_data
+                            pos = img_data.name.rfind('.')
+                            self.image_type = img_data.name[pos+1:] if pos != -1 else ''
+                        elif isinstance(img_data, basestring):
+                            img_data_b64 = img_data
+                    else:
+                        raise ReportBroError(
+                            Error('errorMsgInvalidImageSourceParameter', object_id=image_id, field='source'))
+                else:
+                    raise ReportBroError(
+                        Error('errorMsgMissingParameter', object_id=image_id, field='source'))
+            else:
+                image_url = source
+
+        if img_data_b64 is None and not image_url and self.image_fp is None and image_file:
+            # static image base64 encoded within image element
+            img_data_b64 = image_file
+
+        if img_data_b64:
+            m = re.match('^data:image/(.+);base64,', img_data_b64)
+            if not m:
+                raise ReportBroError(
+                    Error('errorMsgInvalidImage', object_id=image_id, field='source'))
+            self.image_type = m.group(1).lower()
+            img_data = base64.b64decode(re.sub('^data:image/.+;base64,', '', img_data_b64))
+            self.image_fp = BytesIO(img_data)
+        elif image_url:
+            if not (image_url and (image_url.startswith("http://") or image_url.startswith("https://"))):
+                raise ReportBroError(
+                    Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
+            pos = image_url.rfind('.')
+            self.image_type = image_url[pos+1:] if pos != -1 else ''
+
+        if self.image_type is not None:
+            if self.image_type not in ('png', 'jpg', 'jpeg'):
+                raise ReportBroError(
+                    Error('errorMsgUnsupportedImageType', object_id=image_id, field='source'))
+
+        if image_url:
+            try:
+                self.image_fp = BytesIO(urlopen(image_url).read())
+            except Exception as ex:
+                raise ReportBroError(
+                    Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
+
+
 class FPDFRB(fpdf.FPDF):
     def __init__(self, document_properties, additional_fonts):
         if document_properties.orientation == Orientation.portrait:
@@ -424,6 +492,8 @@ class Report:
 
         self.context = Context(self, self.parameters, self.data)
 
+        self.images = dict()  # cached image data
+
         computed_parameters = []
         self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
                           is_test_data=is_test_data, computed_parameters=computed_parameters, parents=[])
@@ -432,6 +502,15 @@ class Report:
                 self.compute_parameters(computed_parameters, self.data)
         except ReportBroError as err:
             self.errors.append(err.error)
+
+    def load_image(self, image_key, ctx, image_id, source, image_file):
+        # test if image is not already loaded into image cache
+        if image_key not in self.images:
+            image = ImageData(ctx, image_id, source, image_file)
+            self.images[image_key] = image
+
+    def get_image(self, image_key):
+        return self.images.get(image_key)
 
     def generate_pdf(self, filename='', add_watermark=False):
         renderer = DocumentPDFRenderer(header_band=self.header,

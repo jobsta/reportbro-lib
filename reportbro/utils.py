@@ -1,3 +1,4 @@
+from __future__ import division
 import sys
 
 
@@ -35,3 +36,19 @@ def to_string(val):
         if not isinstance(val, str):
             return str(val)
     return val
+
+
+# return image size so image fits into configured width/height and keep aspect ratio
+def get_image_display_size(width, height, image_width, image_height):
+    if image_width <= width and image_height <= height:
+        image_display_width, image_display_height = image_width, image_height
+    else:
+        size_ratio = image_width / image_height
+        tmp = width / size_ratio
+        if tmp <= height:
+            image_display_width = width
+            image_display_height = tmp
+        else:
+            image_display_width = height * size_ratio
+            image_display_height = height
+    return image_display_width, image_display_height

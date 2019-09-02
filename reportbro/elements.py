@@ -2,22 +2,21 @@ from __future__ import unicode_literals
 from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
-from io import BytesIO, BufferedReader
+from io import BytesIO
 from typing import List
-import base64
 import datetime
 import decimal
-import os
 import PIL
-import re
 import tempfile
 
 from .barcode128 import code128_image
 from .context import Context
+from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError
+from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElement, FrameRenderElement, SectionRenderElement
 from .structs import Color, BorderStyle, TextStyle
-from .utils import get_float_value, get_int_value, to_string, PY2
+from .utils import get_float_value, get_int_value, to_string, PY2, get_image_display_size
 
 try:
     from urllib.request import urlopen  # For Python 3.0 and later
@@ -28,126 +27,6 @@ try:
     basestring  # For Python 2, str and unicode
 except NameError:
     basestring = str
-
-
-class DocElementBase(object):
-    def __init__(self, report, data):
-        self.report = report
-        self.id = None
-        self.y = get_int_value(data, 'y')
-        self.render_y = 0
-        self.render_bottom = 0
-        self.bottom = self.y
-        self.height = 0
-        self.print_if = None
-        self.remove_empty_element = False
-        self.spreadsheet_hide = True
-        self.spreadsheet_column = None
-        self.spreadsheet_add_empty_row = False
-        self.first_render_element = True
-        self.rendering_complete = False
-        self.predecessors = []
-        self.successors = []
-        self.sort_order = 1  # sort order for elements with same 'y'-value
-
-    def is_predecessor(self, elem):
-        # if bottom of element is above y-coord of first predecessor we do not need to store
-        # the predecessor here because the element is already a predecessor of the first predecessor
-        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom > self.predecessors[0].y)
-
-    def add_predecessor(self, predecessor):
-        self.predecessors.append(predecessor)
-        predecessor.successors.append(self)
-
-    # returns True in case there is at least one predecessor which is not completely rendered yet
-    def has_uncompleted_predecessor(self, completed_elements):
-        for predecessor in self.predecessors:
-            if predecessor.id not in completed_elements or not predecessor.rendering_complete:
-                return True
-        return False
-
-    def get_offset_y(self):
-        max_offset_y = 0
-        for predecessor in self.predecessors:
-            offset_y = predecessor.render_bottom + (self.y - predecessor.bottom)
-            if offset_y > max_offset_y:
-                max_offset_y = offset_y
-        return max_offset_y
-
-    def clear_predecessors(self):
-        self.predecessors = []
-
-    def prepare(self, ctx, pdf_doc, only_verify):
-        pass
-
-    def is_printed(self, ctx):
-        if self.print_if:
-            return ctx.evaluate_expression(self.print_if, self.id, field='print_if')
-        return True
-
-    def finish_empty_element(self, offset_y):
-        if self.remove_empty_element:
-            self.render_bottom = offset_y
-        else:
-            self.render_bottom = offset_y + self.height
-        self.rendering_complete = True
-
-    def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
-        self.rendering_complete = True
-        return None, True
-
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        pass
-
-    def render_spreadsheet(self, row, col, ctx, renderer):
-        return row, col
-
-    def cleanup(self):
-        pass
-
-
-class DocElement(DocElementBase):
-    def __init__(self, report, data):
-        DocElementBase.__init__(self, report, data)
-        self.id = get_int_value(data, 'id')
-        self.x = get_int_value(data, 'x')
-        self.width = get_int_value(data, 'width')
-        self.height = get_int_value(data, 'height')
-        self.bottom = self.y + self.height
-
-    def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
-        if offset_y + self.height <= container_height:
-            self.render_y = offset_y
-            self.render_bottom = offset_y + self.height
-            self.rendering_complete = True
-            return self, True
-        return None, False
-
-    @staticmethod
-    def draw_border(x, y, width, height, render_element_type, border_style, pdf_doc):
-        pdf_doc.set_draw_color(
-            border_style.border_color.r, border_style.border_color.g, border_style.border_color.b)
-        pdf_doc.set_line_width(border_style.border_width)
-        border_offset = border_style.border_width / 2
-        border_x = x + border_offset
-        border_y = y + border_offset
-        border_width = width - border_style.border_width
-        border_height = height - border_style.border_width
-        if border_style.border_all and render_element_type == RenderElementType.complete:
-            pdf_doc.rect(border_x, border_y, border_width, border_height, style='D')
-        else:
-            if border_style.border_left:
-                pdf_doc.line(border_x, border_y, border_x, border_y + border_height)
-            if border_style.border_top and render_element_type in (
-                        RenderElementType.complete, RenderElementType.first):
-                pdf_doc.line(border_x, border_y, border_x + border_width, border_y)
-            if border_style.border_right:
-                pdf_doc.line(border_x + border_width, border_y,
-                        border_x + border_width, border_y + border_height)
-            if border_style.border_bottom and render_element_type in (
-                        RenderElementType.complete, RenderElementType.last):
-                pdf_doc.line(border_x, border_y + border_height,
-                        border_x + border_width, border_y + border_height)
 
 
 class ImageElement(DocElement):
@@ -166,162 +45,68 @@ class ImageElement(DocElement):
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.image_key = None
-        self.image_type = None
-        self.image_fp = None
+        self.prepared_link = None
 
     def prepare(self, ctx, pdf_doc, only_verify):
-        if self.image_key:
-            return
-        img_data_b64 = None
-        is_url = False
+        self.image_key = None
+        # set image_key which is used to fetch cached images
         if self.source:
-            source_parameter = ctx.get_parameter(Context.strip_parameter_name(self.source))
-            if source_parameter:
-                if source_parameter.type == ParameterType.string:
-                    self.image_key, parameter_exists = ctx.get_data(source_parameter.name)
-                    is_url = True
-                elif source_parameter.type == ParameterType.image:
-                    # image is available as base64 encoded or
-                    # file object (only possible if report data is passed directly from python code
-                    # and not via web request)
-                    img_data, parameter_exists = ctx.get_data(source_parameter.name)
-                    if isinstance(img_data, BufferedReader) or\
-                            (PY2 and isinstance(img_data, file)):
-                        self.image_fp = img_data
-                        pos = img_data.name.rfind('.')
-                        self.image_type = img_data.name[pos+1:] if pos != -1 else ''
-                    elif isinstance(img_data, basestring):
-                        img_data_b64 = img_data
-                else:
-                    raise ReportBroError(
-                        Error('errorMsgInvalidImageSourceParameter', object_id=self.id, field='source'))
+            if Context.is_parameter_name(self.source):
+                # use current parameter value as image key
+                source_parameter = ctx.get_parameter(Context.strip_parameter_name(self.source))
+                if source_parameter:
+                    if source_parameter.type == ParameterType.string:
+                        self.image_key, _ = ctx.get_data(source_parameter.name)
+                    elif source_parameter.type == ParameterType.image:
+                        self.image_key = self.source + '_' + str(ctx.get_context_id(source_parameter.name))
             else:
-                source = self.source.strip()
-                if source[0:2] == '${' and source[-1] == '}':
-                    raise ReportBroError(
-                        Error('errorMsgMissingParameter', object_id=self.id, field='source'))
+                # static url
                 self.image_key = self.source
-                is_url = True
-
-        if img_data_b64 is None and not is_url and self.image_fp is None:
-            if self.image_filename and self.image:
-                # static image base64 encoded within image element
-                img_data_b64 = self.image
+        else:
+            # static image
+            if self.image_filename:
                 self.image_key = self.image_filename
-
-        if img_data_b64:
-            m = re.match('^data:image/(.+);base64,', img_data_b64)
-            if not m:
-                raise ReportBroError(
-                    Error('errorMsgInvalidImage', object_id=self.id, field='source'))
-            self.image_type = m.group(1).lower()
-            img_data = base64.b64decode(re.sub('^data:image/.+;base64,', '', img_data_b64))
-            self.image_fp = BytesIO(img_data)
-        elif is_url:
-            if not (self.image_key and
-                    (self.image_key.startswith("http://") or self.image_key.startswith("https://"))):
-                raise ReportBroError(
-                    Error('errorMsgInvalidImageSource', object_id=self.id, field='source'))
-            pos = self.image_key.rfind('.')
-            self.image_type = self.image_key[pos+1:] if pos != -1 else ''
-
-        if self.image_type is not None:
-            if self.image_type not in ('png', 'jpg', 'jpeg'):
-                raise ReportBroError(
-                    Error('errorMsgUnsupportedImageType', object_id=self.id, field='source'))
-            if not self.image_key:
-                self.image_key = 'image_' + str(self.id) + '.' + self.image_type
-        self.image = None
-
-        if is_url:
-            self.image_fp = BytesIO(urlopen(self.image_key).read())
-
+            else:
+                self.image_key = 'image_' + str(self.id)
+        self.report.load_image(self.image_key, ctx, self.id, self.source, self.image)
         if self.link:
-            self.link = ctx.fill_parameters(self.link, self.id, field='link')
-            if not (self.link.startswith('http://') or self.link.startswith('https://')):
+            self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
+            if not (self.prepared_link.startswith('http://') or self.prepared_link.startswith('https://')):
                 raise ReportBroError(
                     Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y
-        if not self.background_color.transparent:
-            pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
-            pdf_doc.rect(x, y, self.width, self.height, 'F')
-        if self.image_key:
-            halign = {HorizontalAlignment.left: 'L', HorizontalAlignment.center: 'C',
-                    HorizontalAlignment.right: 'R'}.get(self.horizontal_alignment)
-            valign = {VerticalAlignment.top: 'T', VerticalAlignment.middle: 'C',
-                    VerticalAlignment.bottom: 'B'}.get(self.vertical_alignment)
-            try:
-                image_info = pdf_doc.image(
-                    self.image_key, x, y, self.width, self.height, type=self.image_type,
-                    image_fp=self.image_fp, halign=halign, valign=valign)
-            except:
-                raise ReportBroError(
-                    Error('errorMsgLoadingImageFailed', object_id=self.id,
-                          field='source' if self.source else 'image'))
-
-            if self.link:
-                # horizontal and vertical alignment of image within given width and height
-                # by keeping original image aspect ratio
-                offset_x = offset_y = 0
-                image_display_width, image_display_height = self.get_image_display_size(
-                    image_info['w'], image_info['h'])
-                if self.horizontal_alignment == HorizontalAlignment.center:
-                    offset_x = (self.width - image_display_width) / 2
-                elif self.horizontal_alignment == HorizontalAlignment.right:
-                    offset_x = self.width - image_display_width
-                if self.vertical_alignment == VerticalAlignment.middle:
-                    offset_y = (self.height - image_display_height) / 2
-                elif self.vertical_alignment == VerticalAlignment.bottom:
-                    offset_y = self.height - image_display_height
-
-                pdf_doc.link(x + offset_x, y + offset_y, image_display_width, image_display_height, self.link)
+    def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
+        _, rv = DocElement.get_next_render_element(self, offset_y, container_height, ctx, pdf_doc)
+        if not rv:
+            return None, False
+        return ImageRenderElement(self.report, offset_y, self), True
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.image_key:
+            image = self.report.get_image(self.image_key)
             if self.spreadsheet_column:
                 col = self.spreadsheet_column - 1
 
-            image = None
             try:
-                image = PIL.Image.open(self.image_fp)
-            except:
+                raw_image = PIL.Image.open(image.image_fp)
+            except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=self.id,
-                          field='source' if self.source else 'image'))
+                          field='source' if self.source else 'image', info=str(ex)))
 
-            image_display_width, image_display_height = self.get_image_display_size(image.width, image.height)
-            if image_display_width != image.width or image_display_height != image.height:
-                image = image.resize((int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
-                self.image_fp = BytesIO()
-                image.save(self.image_fp, format='PNG' if self.image_type.upper() == 'PNG' else 'JPEG')
+            image_display_width, image_display_height = get_image_display_size(
+                self.width, self.height, raw_image.width, raw_image.height)
+            if image_display_width != raw_image.width or image_display_height != raw_image.height:
+                raw_image = raw_image.resize(
+                    (int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
+                image.image_fp = BytesIO()
+                raw_image.save(image.image_fp, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
 
-            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=self.image_fp,
-                                  width=self.width, url=self.link)
+            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_fp,
+                                  width=self.width, url=self.prepared_link)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1
         return row, col
-
-    # return image size so image fits into configured width/height and keep aspect ratio
-    def get_image_display_size(self, image_width, image_height):
-        if image_width <= self.width and image_height <= self.height:
-            image_display_width, image_display_height = image_width, image_height
-        else:
-            size_ratio = image_width / image_height
-            tmp = self.width / size_ratio
-            if tmp <= self.height:
-                image_display_width = self.width
-                image_display_height = tmp
-            else:
-                image_display_width = self.height * size_ratio
-                image_display_height = self.height
-        return image_display_width, image_display_height
-
-    def cleanup(self):
-        if self.image_key:
-            self.image_key = None
 
 
 class BarCodeElement(DocElement):
@@ -339,6 +124,7 @@ class BarCodeElement(DocElement):
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.image_key = None
         self.image_height = self.height - 22 if self.display_value else self.height
+        self.prepared_content = None
 
     def is_printed(self, ctx):
         if not self.content:
@@ -346,12 +132,11 @@ class BarCodeElement(DocElement):
         return DocElementBase.is_printed(self, ctx)
 
     def prepare(self, ctx, pdf_doc, only_verify):
-        if self.image_key:
-            return
-        self.content = ctx.fill_parameters(self.content, self.id, field='content')
-        if self.content:
+        self.image_key = None
+        self.prepared_content = ctx.fill_parameters(self.content, self.id, field='content')
+        if self.prepared_content:
             try:
-                img = code128_image(self.content, height=self.image_height, thickness=2, quiet_zone=False)
+                img = code128_image(self.prepared_content, height=self.image_height, thickness=2, quiet_zone=False)
             except:
                 raise ReportBroError(
                     Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
@@ -361,32 +146,21 @@ class BarCodeElement(DocElement):
                     self.image_key = f.name
                     self.width = img.width
 
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y
-        if self.image_key:
-            pdf_doc.image(self.image_key, x, y, self.width, self.image_height)
-            if self.display_value:
-                pdf_doc.set_font('courier', 'B', 18)
-                pdf_doc.set_text_color(0, 0, 0)
-                content_width = pdf_doc.get_string_width(self.content)
-                offset_x = (self.width - content_width) / 2
-                pdf_doc.text(x + offset_x, y + self.image_height + 20, self.content)
+    def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
+        _, rv = DocElement.get_next_render_element(self, offset_y, container_height, ctx, pdf_doc)
+        if not rv:
+            return None, False
+        return BarCodeRenderElement(self.report, offset_y, self), True
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.content:
             cell_format = dict()
             if self.spreadsheet_column:
                 col = self.spreadsheet_column - 1
-            renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width)
+            renderer.write(row, col, self.spreadsheet_colspan, self.prepared_content, cell_format, self.width)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1
         return row, col
-
-    def cleanup(self):
-        if self.image_key:
-            os.unlink(self.image_key)
-            self.image_key = None
 
 
 class LineElement(DocElement):
@@ -453,6 +227,7 @@ class TextElement(DocElement):
         self.lines_count = 0
         self.text_lines = None
         self.used_style = None
+        self.prepared_link = None
         self.space_top = 0
         self.space_bottom = 0
         self.total_height = 0
@@ -487,8 +262,8 @@ class TextElement(DocElement):
             content = ctx.fill_parameters(self.content, self.id, field='content', pattern=self.pattern)
 
         if self.link:
-            self.link = ctx.fill_parameters(self.link, self.id, field='link')
-            if not (self.link.startswith('http://') or self.link.startswith('https://')):
+            self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
+            if not (self.prepared_link.startswith('http://') or self.prepared_link.startswith('https://')):
                 raise ReportBroError(
                     Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
@@ -522,17 +297,16 @@ class TextElement(DocElement):
                 self.text_height = (len(lines) - 1) * self.line_height + self.used_style.font_size
             self.line_index = 0
             for line in lines:
-                self.text_lines.append(TextLine(line, width=available_width, style=self.used_style, link=self.link))
+                self.text_lines.append(TextLine(line, width=available_width,
+                                                style=self.used_style, link=self.prepared_link))
             if isinstance(self, TableTextElement):
                 self.total_height = max(self.text_height +\
                         self.used_style.padding_top + self.used_style.padding_bottom, self.height)
             else:
                 self.set_height(self.height)
         else:
-            self.content = content
             # set text_lines so is_printed can check for empty element when rendering spreadsheet
-            if content:
-                self.text_lines = [content]
+            self.text_lines = [content] if content else []
 
     def set_height(self, height):
         self.height = height
@@ -683,7 +457,9 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_cell_format
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        renderer.write(row, col, self.spreadsheet_colspan, self.content, cell_format, self.width, url=self.link)
+        content = self.text_lines[0] if self.text_lines else ''
+        renderer.write(row, col, self.spreadsheet_colspan, content, cell_format,
+                       self.width, url=self.prepared_link)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + 1
@@ -946,114 +722,6 @@ class TableRow(object):
         return 0
 
 
-class TableBlockElement(DocElementBase):
-    def __init__(self, report, x, width, render_y, table):
-        DocElementBase.__init__(self, report, dict(y=0))
-        self.report = report
-        self.x = x
-        self.width = width
-        self.render_y = render_y
-        self.render_bottom = render_y
-        self.table = table
-        self.rows = []
-        self.complete = False
-
-    def add_rows(self, rows, allow_split, available_height, offset_y, container_height, ctx, pdf_doc):
-        rows_added = 0
-        if not self.complete:
-            if not allow_split:
-                height = 0
-                for row in rows:
-                    height += row.height
-                if height <= available_height:
-                    for row in rows:
-                        row.create_render_elements(offset_y=offset_y, container_height=container_height,
-                                ctx=ctx, pdf_doc=pdf_doc)
-                    self.rows.extend(rows)
-                    rows_added = len(rows)
-                    available_height -= height
-                    self.height += height
-                    self.render_bottom += height
-                else:
-                    self.complete = True
-            else:
-                for row in rows:
-                    if row.height <= available_height:
-                        row.create_render_elements(offset_y=offset_y, container_height=container_height,
-                                ctx=ctx, pdf_doc=pdf_doc)
-                        self.rows.append(row)
-                        rows_added += 1
-                        available_height -= row.height
-                        self.height += row.height
-                        self.render_bottom += row.height
-                    else:
-                        self.complete = True
-                        break
-        return rows_added
-
-    def is_empty(self):
-        return len(self.rows) == 0
-
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        y = container_offset_y
-        for row in self.rows:
-            row.render_pdf(container_offset_x=container_offset_x + self.x, container_offset_y=y, pdf_doc=pdf_doc)
-            y += row.height
-
-        if self.rows and self.table.border != Border.none:
-            pdf_doc.set_draw_color(self.table.border_color.r, self.table.border_color.g, self.table.border_color.b)
-            pdf_doc.set_line_width(self.table.border_width)
-            half_border_width = self.table.border_width / 2
-            x1 = container_offset_x + self.x
-            x2 = x1 + self.rows[0].get_width()
-            x1 += half_border_width
-            x2 -= half_border_width
-            y1 = self.rows[0].get_render_y() + container_offset_y
-            y2 = y1 + (y - container_offset_y)
-            if self.table.border in (Border.grid, Border.frame_row, Border.frame):
-                pdf_doc.line(x1, y1, x1, y2)
-                pdf_doc.line(x2, y1, x2, y2)
-            y = y1
-            pdf_doc.line(x1, y1, x2, y1)
-            if self.table.border != Border.frame:
-                for row in self.rows[:-1]:
-                    y += row.height
-                    pdf_doc.line(x1, y, x2, y)
-            pdf_doc.line(x1, y2, x2, y2)
-            if self.table.border == Border.grid:
-                columns = self.rows[0].column_data
-                # add half border_width so border is drawn inside right column and can be aligned with
-                # borders of other elements outside the table
-                x = x1
-                y2 = y1 + self.rows[0].height
-                
-                # rows can have different columns (colspan) than other rows so
-                # we draw column borders separately if necessary
-                for row in self.rows[1:]:
-                    current_columns = row.column_data
-                    same_borders = True
-                    if len(columns) == len(current_columns):
-                        for (col1, col2) in zip(columns, current_columns):
-                            if col1.width != col2.width:
-                                same_borders = False
-                                break
-                    else:
-                        same_borders = False
-                    if not same_borders:
-                        x = x1
-                        for column in columns[:-1]:
-                            x += column.width
-                            pdf_doc.line(x, y1, x, y2)
-                        y1 = y2
-                        x = x1
-                        columns = current_columns
-                    y2 += row.height
-
-                for column in columns[:-1]:
-                    x += column.width
-                    pdf_doc.line(x, y1, x, y2)
-
-
 class TableElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
@@ -1159,7 +827,7 @@ class TableElement(DocElement):
         if self.is_rendering_complete():
             self.rendering_complete = True
             return None, True
-        render_element = TableBlockElement(self.report, self.x, self.width, offset_y, self)
+        render_element = TableRenderElement(self.report, self.x, self.width, offset_y, self)
 
         # batch size can be anything >= 3 because each row needs previous and next row to evaluate
         # group expression (in case it is set), the batch size defines the number of table rows
@@ -1329,67 +997,6 @@ class TableBandElement(object):
         assert isinstance(self.column_data, list)
 
 
-class FrameBlockElement(DocElementBase):
-    def __init__(self, report, frame, render_y):
-        DocElementBase.__init__(self, report, dict(y=0))
-        self.report = report
-        self.x = frame.x
-        self.width = frame.width
-        self.border_style = frame.border_style
-        self.background_color = frame.background_color
-        self.render_y = render_y
-        self.render_bottom = render_y
-        self.height = 0
-        self.elements = []
-        self.render_element_type = RenderElementType.none
-        self.complete = False
-
-    def add_elements(self, container, render_element_type, height):
-        self.elements = list(container.render_elements)
-        self.render_element_type = render_element_type
-        self.render_bottom += height
-
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y
-        height = self.render_bottom - self.render_y
-
-        content_x = x
-        content_width = self.width
-        content_y = y
-        content_height = height
-
-        if self.border_style.border_left:
-            content_x += self.border_style.border_width
-            content_width -= self.border_style.border_width
-        if self.border_style.border_right:
-            content_width -= self.border_style.border_width
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            content_y += self.border_style.border_width
-            content_height -= self.border_style.border_width
-        if self.border_style.border_bottom and\
-                self.render_element_type in (RenderElementType.last, RenderElementType.complete):
-            content_height -= self.border_style.border_width
-
-        if not self.background_color.transparent:
-            pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
-            pdf_doc.rect(content_x, content_y, content_width, content_height, style='F')
-
-        render_y = y
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            render_y += self.border_style.border_width
-        for element in self.elements:
-            element.render_pdf(container_offset_x=content_x, container_offset_y=content_y, pdf_doc=pdf_doc)
-
-        if (self.border_style.border_left or self.border_style.border_top or
-                self.border_style.border_right or self.border_style.border_bottom):
-            DocElement.draw_border(
-                x=x, y=y, width=self.width, height=height,
-                render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)
-
-
 class FrameElement(DocElement):
     def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
@@ -1432,7 +1039,7 @@ class FrameElement(DocElement):
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         content_height = container_height
-        render_element = FrameBlockElement(self.report, self, render_y=offset_y)
+        render_element = FrameRenderElement(self.report, self, render_y=offset_y)
 
         if self.border_style.border_top and self.render_element_type == RenderElementType.none:
             content_height -= self.border_style.border_width
@@ -1517,9 +1124,6 @@ class FrameElement(DocElement):
             row += 1
         return row, col
 
-    def cleanup(self):
-        self.container.cleanup()
-
 
 class SectionBandElement(object):
     def __init__(self, report, data, band_type, containers):
@@ -1602,39 +1206,12 @@ class SectionBandElement(object):
         return self.container.render_elements
 
 
-class SectionBlockElement(DocElementBase):
-    def __init__(self, report, render_y):
-        DocElementBase.__init__(self, report, dict(y=0))
-        self.report = report
-        self.render_y = render_y
-        self.render_bottom = render_y
-        self.height = 0
-        self.bands = []
-        self.complete = False
-
-    def is_empty(self):
-        return len(self.bands) == 0
-
-    def add_section_band(self, section_band):
-        if section_band.rendering_complete or not section_band.always_print_on_same_page:
-            band_height = section_band.get_used_band_height()
-            self.bands.append(dict(height=band_height, elements=list(section_band.get_render_elements())))
-            self.height += band_height
-            self.render_bottom += band_height
-
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        y = self.render_y + container_offset_y
-        for band in self.bands:
-            for element in band['elements']:
-                element.render_pdf(container_offset_x=container_offset_x, container_offset_y=y, pdf_doc=pdf_doc)
-            y += band['height']
-
-
 class SectionElement(DocElement):
     def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
         self.data_source = data.get('dataSource', '')
         self.print_if = data.get('printIf', '')
+        self.spreadsheet_hide = False
 
         header = bool(data.get('header'))
         footer = bool(data.get('footer'))
@@ -1704,7 +1281,7 @@ class SectionElement(DocElement):
     def get_next_render_element(self, offset_y, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
-        render_element = SectionBlockElement(self.report, render_y=offset_y)
+        render_element = SectionRenderElement(self.report, render_y=offset_y)
 
         if self.print_header:
             self.header.create_render_elements(offset_y, container_height, ctx, pdf_doc)
@@ -1739,15 +1316,19 @@ class SectionElement(DocElement):
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.header:
+            self.header.container.prepare(ctx, pdf_doc=None)
             row, _ = self.header.container.render_spreadsheet(row, col, ctx, renderer)
-        row, _ = self.content.container.render_spreadsheet(row, col, ctx, renderer)
+
+        while self.row_index < self.row_count:
+            self.row_number += 1
+            self.rows[self.row_index]['row_number'] = self.row_number
+            # push data context of current row so values of current row can be accessed
+            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            self.content.container.prepare(ctx, pdf_doc=None)
+            row, _ = self.content.container.render_spreadsheet(row, col, ctx, renderer)
+            self.row_index += 1
+
         if self.footer:
+            self.footer.container.prepare(ctx, pdf_doc=None)
             row, _ = self.footer.container.render_spreadsheet(row, col, ctx, renderer)
         return row, col
-
-    def cleanup(self):
-        if self.header:
-            self.header.container.cleanup()
-        self.content.container.cleanup()
-        if self.footer:
-            self.footer.container.cleanup()
