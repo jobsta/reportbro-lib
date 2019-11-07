@@ -4,6 +4,7 @@ from babel.numbers import format_decimal
 from babel.dates import format_datetime
 from io import BytesIO
 from typing import List
+import copy
 import datetime
 import decimal
 import PIL
@@ -192,9 +193,11 @@ class TextElement(DocElement):
         self.content = data.get('content', '')
         self.eval = bool(data.get('eval'))
         if data.get('styleId'):
-            self.style = report.styles.get(get_int_value(data, 'styleId'))
-            if self.style is None:
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
                 raise RuntimeError('Style for text element {id} not found'.format(id=self.id))
+            # shallow copy is sufficient in our case
+            self.style = copy.copy(style)
         else:
             self.style = TextStyle(data)
         self.print_if = data.get('printIf', '')
@@ -203,9 +206,11 @@ class TextElement(DocElement):
         self.cs_condition = data.get('cs_condition')
         if self.cs_condition:
             if data.get('cs_styleId'):
-                self.conditional_style = report.styles.get(int(data.get('cs_styleId')))
-                if self.conditional_style is None:
+                style = report.styles.get(int(data.get('cs_styleId')))
+                if style is None:
                     raise RuntimeError('Conditional style for text element {id} not found'.format(id=self.id))
+                # shallow copy is sufficient in our case
+                self.conditional_style = copy.copy(style)
             else:
                 self.conditional_style = TextStyle(data, key_prefix='cs_')
         else:
