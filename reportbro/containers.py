@@ -143,7 +143,7 @@ class Container(object):
                 # remove dependency to predecessors because successor element is either already added
                 # to render_elements or on new page
                 for successor in processed_element.successors:
-                    successor.clear_predecessors()
+                    successor.clear_predecessor(processed_element)
         return len(self.sorted_elements) == 0
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc, cleanup=False):

@@ -23,9 +23,10 @@ class DocElementBase(object):
         self.sort_order = 1  # sort order for elements with same 'y'-value
 
     def is_predecessor(self, elem):
-        # if bottom of element is above y-coord of first predecessor we do not need to store
-        # the predecessor here because the element is already a predecessor of the first predecessor
-        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom > self.predecessors[0].y)
+        # we need to store multiple predecessors if they have the same y-coord because we do not know
+        # in advance which one of them is the largest. the current element can only be printed after
+        # all predecessors are finished
+        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom >= self.predecessors[0].y)
 
     def add_predecessor(self, predecessor):
         self.predecessors.append(predecessor)
@@ -46,8 +47,9 @@ class DocElementBase(object):
                 max_offset_y = offset_y
         return max_offset_y
 
-    def clear_predecessors(self):
-        self.predecessors = []
+    def clear_predecessor(self, elem):
+        if elem in self.predecessors:
+            self.predecessors.remove(elem)
 
     def prepare(self, ctx, pdf_doc, only_verify):
         pass
