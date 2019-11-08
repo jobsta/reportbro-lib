@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.3] - 2019-11-08
+
+### Changes
+* show error details when returning string representation of ReportBro exception
+
+### Bug Fixes
+* fix rendering element with multiple predecessor elements (elements with same bottom y-coord)
+* fix rendering table cell with selected style when style contains transparent background color
+
 ## [1.3.1] - 2019-09-02
 
 ### Bug Fixes
