@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.4] - 2019-12-23
+
+### Bug Fixes
+* fix rendering issue when previous element is removed and use correct space to last predecessor
+
 ## [1.3.3] - 2019-11-08
 
 ### Changes
