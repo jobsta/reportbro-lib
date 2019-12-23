@@ -43,7 +43,7 @@ setup(
         'enum34',
         'reportbro-fpdf>=1.7.9',
         'Pillow>=4.0',
-        'simpleeval',
+        'simpleeval>=0.9.10',
         'typing',
         'xlsxwriter'
     ],
