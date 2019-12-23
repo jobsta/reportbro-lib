@@ -3,6 +3,8 @@ from .utils import get_int_value
 
 
 class DocElementBase(object):
+    """Base class for all elements defined in the report template."""
+
     def __init__(self, report, data):
         self.report = report
         self.id = None
@@ -23,29 +25,43 @@ class DocElementBase(object):
         self.sort_order = 1  # sort order for elements with same 'y'-value
 
     def is_predecessor(self, elem):
-        # we need to store multiple predecessors if they have the same y-coord because we do not know
-        # in advance which one of them is the largest. the current element can only be printed after
-        # all predecessors are finished
-        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom >= self.predecessors[0].y)
+        """Returns true if the given element is a direct predecessor of this element.
+
+        An element is a direct predecessor if it ends before or on the same position as
+        this elements starts. Further it has to end after start of a possible
+        existing predecessor, if this is not the case then the given element is already
+        a predecessor of the existing predecessor.
+
+        The current element can only be printed after all predecessors are finished.
+        """
+        return self.y >= elem.bottom and (len(self.predecessors) == 0 or elem.bottom > self.predecessors[0].y)
 
     def add_predecessor(self, predecessor):
         self.predecessors.append(predecessor)
         predecessor.successors.append(self)
 
-    # returns True in case there is at least one predecessor which is not completely rendered yet
     def has_uncompleted_predecessor(self, completed_elements):
+        """returns True in case there is at least one predecessor which is not completely rendered yet."""
         for predecessor in self.predecessors:
             if predecessor.id not in completed_elements or not predecessor.rendering_complete:
                 return True
         return False
 
     def get_offset_y(self):
-        max_offset_y = 0
+        """Returns offset y-coord for rendering of this element.
+
+        The value is calculated as lowest bottom (i.e. highest value) of predecessors plus
+        minimum space to any predecessor.
+        """
+        max_bottom = 0
+        min_predecessor_dist = None
         for predecessor in self.predecessors:
-            offset_y = predecessor.render_bottom + (self.y - predecessor.bottom)
-            if offset_y > max_offset_y:
-                max_offset_y = offset_y
-        return max_offset_y
+            if predecessor.render_bottom > max_bottom:
+                max_bottom = predecessor.render_bottom
+            predecessor_dist = (self.y - predecessor.bottom)
+            if min_predecessor_dist is None or predecessor_dist < min_predecessor_dist:
+                min_predecessor_dist = predecessor_dist
+        return max_bottom + (min_predecessor_dist if min_predecessor_dist else 0)
 
     def clear_predecessor(self, elem):
         if elem in self.predecessors:
