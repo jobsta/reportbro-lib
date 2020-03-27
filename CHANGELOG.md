@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0] - 2020
+
+### Changes
+* add page_limit parameter to ReportBro constructor to define custom page limit
+
 ## [1.3.4] - 2019-12-23
 
 ### Bug Fixes
