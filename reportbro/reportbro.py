@@ -44,7 +44,7 @@ regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
 
 class DocumentPDFRenderer:
     def __init__(self, header_band, content_band, footer_band, report, context,
-            additional_fonts, filename, add_watermark):
+                 additional_fonts, filename, add_watermark, page_limit):
         self.header_band = header_band
         self.content_band = content_band
         self.footer_band = footer_band
@@ -55,6 +55,7 @@ class DocumentPDFRenderer:
         self.context = context
         self.filename = filename
         self.add_watermark = add_watermark
+        self.page_limit = page_limit
 
     def add_page(self):
         self.pdf_doc.add_page()
@@ -88,7 +89,7 @@ class DocumentPDFRenderer:
             if complete:
                 break
             page_count += 1
-            if page_count >= 10000:
+            if self.page_limit and page_count > self.page_limit:
                 raise RuntimeError('Too many pages (probably an endless loop)')
         self.context.set_page_count(page_count)
 
@@ -412,7 +413,7 @@ class FPDFRB(fpdf.FPDF):
 
         
 class Report:
-    def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None):
+    def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None, page_limit=10000):
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
 
@@ -431,6 +432,7 @@ class Report:
         self.is_test_data = is_test_data
 
         self.additional_fonts = additional_fonts
+        self.page_limit = page_limit
 
         version = report_definition.get('version')
         if isinstance(version, int):
@@ -517,7 +519,7 @@ class Report:
                 content_band=self.content, footer_band=self.footer,
                 report=self, context=self.context,
                 additional_fonts=self.additional_fonts,
-                filename=filename, add_watermark=add_watermark)
+                filename=filename, add_watermark=add_watermark, page_limit=self.page_limit)
         return renderer.render()
 
     def generate_xlsx(self, filename=''):
