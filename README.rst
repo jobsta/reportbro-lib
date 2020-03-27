@@ -1,7 +1,7 @@
 ReportBro Lib
 =================
 
-ReportBro is a library to generate PDF and XLSX reports. Report templates can be created 
+ReportBro is a library to generate PDF and XLSX reports. Report templates can be created
 with `ReportBro Designer <https://github.com/jobsta/reportbro-designer>`_,
 a Javascript Plugin which can be integrated in your web application.
 
@@ -24,8 +24,17 @@ Installation
 .. code:: shell
 
     pip install reportbro-lib
-    
+
 Go to https://www.reportbro.com/docs for more information on configuration and usage.
+
+Python Coding Style
+-------------------
+
+The `PEP 8 (Python Enhancement Proposal) <https://www.python.org/dev/peps/pep-0008/>`_
+standard is used which is the de-facto code style guide for Python. An easy-to-read version
+of PEP 8 can be found at https://pep8.org
+
+For pull requests the same coding styles should be used.
 
 License
 -------
