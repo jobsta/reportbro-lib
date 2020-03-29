@@ -673,10 +673,10 @@ class TableRow(object):
         else:
             if self.table_band.group_expression:
                 self.group_expression = ctx.evaluate_expression(
-                    self.table_band.group_expression, self.table_band.id, field='group_expression')
+                    self.table_band.group_expression, self.table_band.id, field='groupExpression')
             if self.table_band.print_if:
                 self.print_if_result = ctx.evaluate_expression(
-                    self.table_band.print_if, self.table_band.id, field='print_if')
+                    self.table_band.print_if, self.table_band.id, field='printIf')
             heights = [self.table_band.height]
             for column_element in self.column_data:
                 column_element.prepare(ctx, pdf_doc, only_verify=False)
@@ -780,7 +780,7 @@ class TableElement(DocElement):
         if self.header:
             for column_idx, column in enumerate(self.header.column_data):
                 if column.get('printIf'):
-                    printed = ctx.evaluate_expression(column.get('printIf'), column.get('id'), field='print_if')
+                    printed = ctx.evaluate_expression(column.get('printIf'), column.get('id'), field='printIf')
                     if not printed:
                         del self.columns[column_idx]
         parameter_name = Context.strip_parameter_name(self.data_source)
@@ -789,19 +789,19 @@ class TableElement(DocElement):
             self.data_source_parameter = ctx.get_parameter(parameter_name)
             if self.data_source_parameter is None:
                 raise ReportBroError(
-                    Error('errorMsgMissingParameter', object_id=self.id, field='data_source'))
+                    Error('errorMsgMissingParameter', object_id=self.id, field='dataSource'))
             if self.data_source_parameter.type != ParameterType.array:
                 raise ReportBroError(
-                    Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
+                    Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
             for row_parameter in self.data_source_parameter.children:
                 self.row_parameters[row_parameter.name] = row_parameter
             self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
             if not parameter_exists:
                 raise ReportBroError(
-                    Error('errorMsgMissingData', object_id=self.id, field='data_source'))
+                    Error('errorMsgMissingData', object_id=self.id, field='dataSource'))
             if not isinstance(self.rows, list):
                 raise ReportBroError(
-                    Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
+                    Error('errorMsgInvalidDataSource', object_id=self.id, field='dataSource'))
         else:
             # there is no data source parameter so we create a static table (faked by one empty data row)
             self.rows = [dict()]
@@ -1252,19 +1252,19 @@ class SectionElement(DocElement):
         self.data_source_parameter = ctx.get_parameter(parameter_name)
         if not self.data_source_parameter:
             raise ReportBroError(
-                Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='data_source'))
+                Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='dataSource'))
         if self.data_source_parameter.type != ParameterType.array:
             raise ReportBroError(
-                Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='data_source'))
+                Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
         for row_parameter in self.data_source_parameter.children:
             self.row_parameters[row_parameter.name] = row_parameter
         self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
         if not parameter_exists:
             raise ReportBroError(
-                Error('errorMsgMissingData', object_id=self.id, field='data_source'))
+                Error('errorMsgMissingData', object_id=self.id, field='dataSource'))
         if not isinstance(self.rows, list):
             raise ReportBroError(
-                Error('errorMsgInvalidDataSource', object_id=self.id, field='data_source'))
+                Error('errorMsgInvalidDataSource', object_id=self.id, field='dataSource'))
 
         self.row_count = len(self.rows)
         self.row_index = 0

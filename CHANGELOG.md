@@ -4,6 +4,10 @@
 
 ### Changes
 * add page_limit parameter to ReportBro constructor to define custom page limit
+* adapt field values of Error object to changes in latest reportbro-designer release
+
+### Bug Fixes
+* fix bug with ReportBroError instance when trying to format a number parameter with an invalid pattern
 
 ## [1.3.4] - 2019-12-23
 

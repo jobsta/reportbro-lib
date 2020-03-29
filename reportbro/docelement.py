@@ -72,7 +72,7 @@ class DocElementBase(object):
 
     def is_printed(self, ctx):
         if self.print_if:
-            return ctx.evaluate_expression(self.print_if, self.id, field='print_if')
+            return ctx.evaluate_expression(self.print_if, self.id, field='printIf')
         return True
 
     def finish_empty_element(self, offset_y):

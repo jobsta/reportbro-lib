@@ -198,7 +198,7 @@ class Context:
                 except ValueError:
                     error_object_id = object_id if pattern else parameter.id
                     raise ReportBroError(
-                        Error('errorMsgInvalidPattern', object_id=error_object_id, field='pattern'))
+                        Error('errorMsgInvalidPattern', object_id=error_object_id, field='pattern', context=value))
             else:
                 rv = str(value)
         elif value_type == ParameterType.date:
@@ -210,7 +210,7 @@ class Context:
                     error_object_id = object_id if pattern else parameter.id
                     raise ReportBroError(
                         Error('errorMsgInvalidPattern',
-                              object_id=error_object_id, field='pattern', context=expr))
+                              object_id=error_object_id, field='pattern', context=value))
             else:
                 rv = str(value)
         return rv
