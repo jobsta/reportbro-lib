@@ -411,7 +411,7 @@ class FPDFRB(fpdf.FPDF):
                 style += 'U'
             fpdf.FPDF.set_font(self, family, style, size)
 
-        
+
 class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None, page_limit=10000):
         assert isinstance(report_definition, dict)
@@ -483,13 +483,13 @@ class Report:
             if elem and container:
                 if container.is_visible():
                     if elem.x < 0:
-                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='position'))
+                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='x'))
                     elif elem.x + elem.width > container.width:
-                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='position'))
+                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='width'))
                     if elem.y < 0:
-                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='position'))
+                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='y'))
                     elif elem.y + elem.height > container.height:
-                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='position'))
+                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='height'))
                 container.add(elem)
 
         self.context = Context(self, self.parameters, self.data)

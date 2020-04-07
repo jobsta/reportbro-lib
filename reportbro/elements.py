@@ -382,7 +382,7 @@ class TextElement(DocElement):
             else:
                 # already on top of container -> raise error
                 raise ReportBroError(
-                    Error('errorMsgInvalidSize', object_id=self.id, field='size'))
+                    Error('errorMsgInvalidSize', object_id=self.id, field='height'))
 
         rendering_complete = self.line_index >= self.lines_count and self.space_top == 0 and self.space_bottom == 0
         if not rendering_complete and remaining_height > 0:
