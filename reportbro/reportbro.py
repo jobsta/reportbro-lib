@@ -281,17 +281,19 @@ class DocumentProperties:
 
 
 class ImageData:
-    def __init__(self, ctx, image_id, source, image_file):
+    def __init__(self, ctx, image_id, source, image_file, is_test_data):
         self.image_fp = None
         self.image_type = None
+        image_uri = None  # can be either url or file path
         image_url = None
+        image_path = None
         img_data_b64 = None
         if source:
             if Context.is_parameter_name(source):
                 source_parameter = ctx.get_parameter(Context.strip_parameter_name(source))
                 if source_parameter:
                     if source_parameter.type == ParameterType.string:
-                        image_url, _ = ctx.get_data(source_parameter.name)
+                        image_uri, _ = ctx.get_data(source_parameter.name)
                     elif source_parameter.type == ParameterType.image:
                         # image is available as base64 encoded or
                         # file object (only possible if report data is passed directly from python code
@@ -311,9 +313,9 @@ class ImageData:
                     raise ReportBroError(
                         Error('errorMsgMissingParameter', object_id=image_id, field='source'))
             else:
-                image_url = source
+                image_uri = source
 
-        if img_data_b64 is None and not image_url and self.image_fp is None and image_file:
+        if img_data_b64 is None and not image_uri and self.image_fp is None and image_file:
             # static image base64 encoded within image element
             img_data_b64 = image_file
 
@@ -325,12 +327,18 @@ class ImageData:
             self.image_type = m.group(1).lower()
             img_data = base64.b64decode(re.sub('^data:image/.+;base64,', '', img_data_b64))
             self.image_fp = BytesIO(img_data)
-        elif image_url:
-            if not (image_url and (image_url.startswith("http://") or image_url.startswith("https://"))):
+        elif image_uri:
+            if image_uri.startswith("http://") or image_uri.startswith("https://"):
+                image_url = image_uri
+            elif not is_test_data and image_uri.startswith("file:"):
+                # only allow image path (referencing file on server) when data is passed directly
+                # and not from Reportbro Designer
+                image_path = image_uri[5:]
+            else:
                 raise ReportBroError(
                     Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
-            pos = image_url.rfind('.')
-            self.image_type = image_url[pos+1:] if pos != -1 else ''
+            pos = image_uri.rfind('.')
+            self.image_type = image_uri[pos+1:] if pos != -1 else ''
 
         if self.image_type is not None:
             if self.image_type not in ('png', 'jpg', 'jpeg'):
@@ -340,6 +348,17 @@ class ImageData:
         if image_url:
             try:
                 self.image_fp = BytesIO(urlopen(image_url).read())
+            except Exception as ex:
+                raise ReportBroError(
+                    Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
+        elif image_path:
+            try:
+                cwd = os.getcwd()
+                image_path = os.path.abspath(image_path)
+                # make sure image file access is restricted to application
+                if os.path.commonprefix([cwd, image_path]) != cwd:
+                    raise Exception('Accessing file outside of application path not allowed')
+                self.image_fp = open(image_path, 'rb')
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
@@ -508,7 +527,7 @@ class Report:
     def load_image(self, image_key, ctx, image_id, source, image_file):
         # test if image is not already loaded into image cache
         if image_key not in self.images:
-            image = ImageData(ctx, image_id, source, image_file)
+            image = ImageData(ctx, image_id, source, image_file, self.is_test_data)
             self.images[image_key] = image
 
     def get_image(self, image_key):
