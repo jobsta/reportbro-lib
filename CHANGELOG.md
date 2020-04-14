@@ -5,6 +5,11 @@
 ### Changes
 * add page_limit parameter to ReportBro constructor to define custom page limit
 * adapt field values of Error object to changes in latest reportbro-designer release
+* allow file path in text parameter for image source
+* use default request headers for loading image with urlopen when image is specified by url
+(some sites check for existance of 'user-agent' request header and do not return image otherwise)
+* allow to override request headers used when fetching images in ReportBro constructor
+* allow query parameters in url for image source
 
 ### Bug Fixes
 * fix bug with ReportBroError instance when trying to format a number parameter with an invalid pattern

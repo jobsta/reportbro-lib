@@ -19,10 +19,14 @@ from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElem
 from .structs import Color, BorderStyle, TextStyle
 from .utils import get_float_value, get_int_value, to_string, PY2, get_image_display_size
 
-try:
-    from urllib.request import urlopen  # For Python 3.0 and later
-except ImportError:
-    from urllib2 import urlopen  # Fall back to Python 2's urllib2
+if PY2:
+    import urllib2
+else:
+    import urllib
+# try:
+#     from urllib.request import urlopen  # For Python 3.0 and later
+# except ImportError:
+#     from urllib2 import urlopen  # Fall back to Python 2's urllib2
 
 try:
     basestring  # For Python 2, str and unicode

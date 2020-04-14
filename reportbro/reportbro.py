@@ -281,7 +281,7 @@ class DocumentProperties:
 
 
 class ImageData:
-    def __init__(self, ctx, image_id, source, image_file, is_test_data):
+    def __init__(self, ctx, image_id, source, image_file, is_test_data, headers):
         self.image_fp = None
         self.image_type = None
         image_uri = None  # can be either url or file path
@@ -330,15 +330,25 @@ class ImageData:
         elif image_uri:
             if image_uri.startswith("http://") or image_uri.startswith("https://"):
                 image_url = image_uri
+                try:
+                    if PY2:
+                        parse_result = urllib2.urlparse.urlparse(image_url)
+                    else:
+                        parse_result = urllib.parse.urlparse(image_url)
+                    pos = parse_result.path.rfind('.')
+                    self.image_type = parse_result.path[pos+1:] if pos != -1 else ''
+                except ValueError as ex:
+                    raise ReportBroError(
+                        Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
             elif not is_test_data and image_uri.startswith("file:"):
                 # only allow image path (referencing file on server) when data is passed directly
                 # and not from Reportbro Designer
                 image_path = image_uri[5:]
+                pos = image_uri.rfind('.')
+                self.image_type = image_uri[pos+1:] if pos != -1 else ''
             else:
                 raise ReportBroError(
                     Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
-            pos = image_uri.rfind('.')
-            self.image_type = image_uri[pos+1:] if pos != -1 else ''
 
         if self.image_type is not None:
             if self.image_type not in ('png', 'jpg', 'jpeg'):
@@ -347,7 +357,12 @@ class ImageData:
 
         if image_url:
             try:
-                self.image_fp = BytesIO(urlopen(image_url).read())
+                if PY2:
+                    req = urllib2.Request(image_url, headers=headers)
+                    self.image_fp = BytesIO(urllib2.urlopen(req).read())
+                else:
+                    req = urllib.request.Request(image_url, headers=headers)
+                    self.image_fp = BytesIO(urllib.request.urlopen(req).read())
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
@@ -432,7 +447,8 @@ class FPDFRB(fpdf.FPDF):
 
 
 class Report:
-    def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None, page_limit=10000):
+    def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,
+                 page_limit=10000, request_headers=None):
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
 
@@ -452,6 +468,11 @@ class Report:
 
         self.additional_fonts = additional_fonts
         self.page_limit = page_limit
+        # request headers used when fetching images by url (some sites check for existance
+        # of user-agent header and do not return image otherwise)
+        self.request_headers = {'User-Agent': 'Mozilla/5.0'}
+        if request_headers is not None:
+            self.request_headers = request_headers
 
         version = report_definition.get('version')
         if isinstance(version, int):
@@ -527,7 +548,7 @@ class Report:
     def load_image(self, image_key, ctx, image_id, source, image_file):
         # test if image is not already loaded into image cache
         if image_key not in self.images:
-            image = ImageData(ctx, image_id, source, image_file, self.is_test_data)
+            image = ImageData(ctx, image_id, source, image_file, self.is_test_data, headers=self.request_headers)
             self.images[image_key] = image
 
     def get_image(self, image_key):
