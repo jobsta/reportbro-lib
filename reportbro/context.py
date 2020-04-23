@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
+from collections import namedtuple
 from simpleeval import simple_eval, NameNotDefined, FunctionNotDefined
 from simpleeval import DEFAULT_NAMES as EVAL_DEFAULT_NAMES
 from simpleeval import DEFAULT_FUNCTIONS as EVAL_DEFAULT_FUNCTIONS
@@ -10,6 +11,10 @@ import decimal
 
 from .enums import *
 from .errors import Error, ReportBroError
+
+
+# parameter instance and the data map referenced by the parameter
+ParameterRef = namedtuple('ParameterRef', ['parameter', 'data'])
 
 
 class Context:
@@ -33,13 +38,64 @@ class Context:
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0
 
-    def get_parameter(self, name, parameters=None):
-        if parameters is None:
-            parameters = self.parameters
+    def get_parameter(self, name):
+        """Return parameter reference for given parameter name.
+
+        :param name: name of the parameter to find, the parameter can be present in the current
+        context or any of its parents.
+        :return: parameter reference which contains a parameter instance and
+        its data map referenced by the parameter. None if no parameter was found.
+        """
+        if name.find('.') != -1:
+            # this parameter is part of a collection, so we first get the reference to the
+            # collection parameter and then return the parameter inside the collection
+            name_parts = name.split('.')
+            collection_name = name_parts[0]
+            field_name = name_parts[1]
+            param_ref = self._get_parameter(
+                collection_name, parameters=self.parameters, data=self.data)
+            if param_ref is not None and param_ref.parameter.type == ParameterType.map and\
+                    field_name in param_ref.parameter.fields and collection_name in param_ref.data:
+                return ParameterRef(parameter=param_ref.parameter.fields[field_name],
+                                    data=param_ref.data[collection_name])
+            return None
+        else:
+            return self._get_parameter(name, parameters=self.parameters, data=self.data)
+
+    def _get_parameter(self, name, parameters, data):
         if name in parameters:
-            return parameters[name]
-        elif parameters.get('__parent'):
-            return self.get_parameter(name, parameters.get('__parent'))
+            return ParameterRef(parameter=parameters[name], data=data)
+        elif parameters.get('__parent') and data.get('__parent'):
+            return self._get_parameter(
+                name, parameters=parameters.get('__parent'), data=data.get('__parent'))
+        return None
+
+    @staticmethod
+    def get_parameter_data(param_ref):
+        """Return data for given parameter reference.
+
+        :param param_ref: a parameter reference which contains a parameter instance and
+        its data map referenced by the parameter.
+        :return: tuple of current data value of parameter, bool if parameter data exists
+        """
+        if param_ref.parameter.name in param_ref.data:
+            return param_ref.data[param_ref.parameter.name], True
+        return None, False
+
+    @staticmethod
+    def get_parameter_context_id(param_ref):
+        """Return context_id for given parameter reference.
+
+        This can be useful to find out if a parameter value has changed,
+        e.g. parameter 'amount' in a list of invoice items has a different context_id
+        in each list row (invoice item).
+
+        :param param_ref: a parameter reference which contains a parameter instance and
+        its data map referenced by the parameter.
+        :return: unique context id or None if there is no context available.
+        """
+        if param_ref.parameter.name in param_ref.data:
+            return param_ref.data['__context_id']
         return None
 
     def get_data(self, name, data=None):
@@ -50,18 +106,6 @@ class Context:
         elif data.get('__parent'):
             return self.get_data(name, data.get('__parent'))
         return None, False
-
-    # return context_id for given parameter. this can be useful to find out if a parameter value
-    # has changed, e.g. parameter 'amount' in a list of invoice items has a different context_id
-    # in each list row (invoice item).
-    def get_context_id(self, name, data=None):
-        if data is None:
-            data = self.data
-        if name in data:
-            return data['__context_id']
-        elif data.get('__parent'):
-            return self.get_context_id(name, data.get('__parent'))
-        return None
 
     def push_context(self, parameters, data):
         parameters['__parent'] = self.parameters
@@ -99,42 +143,20 @@ class Context:
             else:
                 if c == '}':
                     parameter_name = expr[parameter_index:i]
-                    collection_name = None
-                    field_name = None
-                    if parameter_name.find('.') != -1:
-                        name_parts = parameter_name.split('.')
-                        collection_name = name_parts[0]
-                        field_name = name_parts[1]
-                        parameter = self.get_parameter(collection_name)
-                        if parameter is None:
-                            raise ReportBroError(
-                                Error('errorMsgInvalidExpressionNameNotDefined',
-                                      object_id=object_id, field=field, info=collection_name))
-                    else:
-                        parameter = self.get_parameter(parameter_name)
-                        if parameter is None:
-                            raise ReportBroError(
-                                Error('errorMsgInvalidExpressionNameNotDefined',
-                                      object_id=object_id, field=field, info=parameter_name))
-                    value = None
-                    if parameter.type == ParameterType.map:
-                        parameter = self.get_parameter(field_name, parameters=parameter.fields)
-                        if parameter is None:
-                            raise ReportBroError(
-                                Error('errorMsgInvalidExpressionNameNotDefined',
-                                      object_id=object_id, field=field, info=parameter_name))
-                        map_value, parameter_exists = self.get_data(collection_name)
-                        if parameter and isinstance(map_value, dict):
-                            value = map_value.get(field_name)
-                    else:
-                        value, parameter_exists = self.get_data(parameter_name)
-                    if not parameter_exists:
+                    param_ref = self.get_parameter(parameter_name)
+                    if param_ref is None:
+                        raise ReportBroError(
+                            Error('errorMsgInvalidExpressionNameNotDefined',
+                                  object_id=object_id, field=field, info=parameter_name))
+                    value, value_exists = Context.get_parameter_data(param_ref)
+
+                    if not value_exists:
                         raise ReportBroError(
                             Error('errorMsgMissingParameterData',
                                   object_id=object_id, field=field, info=parameter_name))
 
                     if value is not None:
-                        ret += self.get_formatted_value(value, parameter, object_id, pattern=pattern)
+                        ret += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
                     parameter_index = -1
             prev_c = c
         return ret

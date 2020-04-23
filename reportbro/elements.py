@@ -23,10 +23,6 @@ if PY2:
     import urllib2
 else:
     import urllib
-# try:
-#     from urllib.request import urlopen  # For Python 3.0 and later
-# except ImportError:
-#     from urllib2 import urlopen  # Fall back to Python 2's urllib2
 
 try:
     basestring  # For Python 2, str and unicode
@@ -58,12 +54,14 @@ class ImageElement(DocElement):
         if self.source:
             if Context.is_parameter_name(self.source):
                 # use current parameter value as image key
-                source_parameter = ctx.get_parameter(Context.strip_parameter_name(self.source))
-                if source_parameter:
+                param_ref = ctx.get_parameter(Context.strip_parameter_name(self.source))
+                if param_ref:
+                    source_parameter = param_ref.parameter
                     if source_parameter.type == ParameterType.string:
-                        self.image_key, _ = ctx.get_data(source_parameter.name)
+                        self.image_key, _ = Context.get_parameter_data(param_ref)
                     elif source_parameter.type == ParameterType.image:
-                        self.image_key = self.source + '_' + str(ctx.get_context_id(source_parameter.name))
+                        self.image_key = self.source + '_' +\
+                                         str(Context.get_parameter_context_id(param_ref))
             else:
                 # static url
                 self.image_key = self.source
@@ -629,19 +627,23 @@ class TableRow(object):
                 is_simple_array = False
                 if column_element.content and not column_element.eval and\
                         Context.is_parameter_name(column_element.content):
-                    column_data_parameter = ctx.get_parameter(Context.strip_parameter_name(column_element.content))
-                    if column_data_parameter and column_data_parameter.type == ParameterType.simple_array:
-                        is_simple_array = True
-                        column_values, parameter_exists = ctx.get_data(column_data_parameter.name)
-                        for idx, column_value in enumerate(column_values):
-                            formatted_val = ctx.get_formatted_value(column_value, column_data_parameter,
-                                                                    object_id=None, is_array_item=True)
-                            if idx == 0:
-                                column_element.content = formatted_val
-                            else:
-                                column_element = TableTextElement(report, table_band.column_data[column])
-                                column_element.content = formatted_val
-                                self.column_data.append(column_element)
+                    param_ref = ctx.get_parameter(Context.strip_parameter_name(column_element.content))
+                    if param_ref:
+                        column_data_parameter = param_ref.parameter
+                        if column_data_parameter.type == ParameterType.simple_array:
+                            is_simple_array = True
+                            column_values, value_exists = Context.get_parameter_data(param_ref)
+                            if value_exists:
+                                for col_idx, column_value in enumerate(column_values):
+                                    formatted_val = ctx.get_formatted_value(
+                                        column_value, column_data_parameter,
+                                        object_id=None, is_array_item=True)
+                                    if col_idx == 0:
+                                        column_element.content = formatted_val
+                                    else:
+                                        column_element = TableTextElement(report, table_band.column_data[column])
+                                        column_element.content = formatted_val
+                                        self.column_data.append(column_element)
                 # store info if column content is a simple array parameter to
                 # avoid checks for the next rows
                 table_band.column_data[column]['simple_array'] = is_simple_array
@@ -760,7 +762,6 @@ class TableElement(DocElement):
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
-        self.data_source_parameter = None
         self.row_parameters = dict()
         self.rows = []
         self.row_count = 0
@@ -788,18 +789,18 @@ class TableElement(DocElement):
                     if not printed:
                         del self.columns[column_idx]
         parameter_name = Context.strip_parameter_name(self.data_source)
-        self.data_source_parameter = None
         if parameter_name:
-            self.data_source_parameter = ctx.get_parameter(parameter_name)
-            if self.data_source_parameter is None:
+            param_ref = ctx.get_parameter(parameter_name)
+            if param_ref is None:
                 raise ReportBroError(
                     Error('errorMsgMissingParameter', object_id=self.id, field='dataSource'))
-            if self.data_source_parameter.type != ParameterType.array:
+            data_source_parameter = param_ref.parameter
+            if data_source_parameter.type != ParameterType.array:
                 raise ReportBroError(
                     Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
-            for row_parameter in self.data_source_parameter.children:
+            for row_parameter in data_source_parameter.children:
                 self.row_parameters[row_parameter.name] = row_parameter
-            self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
+            self.rows, parameter_exists = Context.get_parameter_data(param_ref)
             if not parameter_exists:
                 raise ReportBroError(
                     Error('errorMsgMissingData', object_id=self.id, field='dataSource'))
@@ -1244,7 +1245,6 @@ class SectionElement(DocElement):
             self.height += self.footer.height
         self.bottom = self.y + self.height
 
-        self.data_source_parameter = None
         self.row_parameters = dict()
         self.rows = []
         self.row_count = 0
@@ -1253,16 +1253,17 @@ class SectionElement(DocElement):
 
     def prepare(self, ctx, pdf_doc, only_verify):
         parameter_name = Context.strip_parameter_name(self.data_source)
-        self.data_source_parameter = ctx.get_parameter(parameter_name)
-        if not self.data_source_parameter:
+        param_ref = ctx.get_parameter(parameter_name)
+        if param_ref is None:
             raise ReportBroError(
                 Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='dataSource'))
-        if self.data_source_parameter.type != ParameterType.array:
+        data_source_parameter = param_ref.parameter
+        if data_source_parameter.type != ParameterType.array:
             raise ReportBroError(
                 Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
-        for row_parameter in self.data_source_parameter.children:
+        for row_parameter in data_source_parameter.children:
             self.row_parameters[row_parameter.name] = row_parameter
-        self.rows, parameter_exists = ctx.get_data(self.data_source_parameter.name)
+        self.rows, parameter_exists = Context.get_parameter_data(param_ref)
         if not parameter_exists:
             raise ReportBroError(
                 Error('errorMsgMissingData', object_id=self.id, field='dataSource'))

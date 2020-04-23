@@ -290,15 +290,16 @@ class ImageData:
         img_data_b64 = None
         if source:
             if Context.is_parameter_name(source):
-                source_parameter = ctx.get_parameter(Context.strip_parameter_name(source))
-                if source_parameter:
+                param_ref = ctx.get_parameter(Context.strip_parameter_name(source))
+                if param_ref:
+                    source_parameter = param_ref.parameter
                     if source_parameter.type == ParameterType.string:
-                        image_uri, _ = ctx.get_data(source_parameter.name)
+                        image_uri, _ = Context.get_parameter_data(param_ref)
                     elif source_parameter.type == ParameterType.image:
                         # image is available as base64 encoded or
                         # file object (only possible if report data is passed directly from python code
                         # and not via web request)
-                        img_data, _ = ctx.get_data(source_parameter.name)
+                        img_data, _ = Context.get_parameter_data(param_ref)
                         if isinstance(img_data, BufferedReader) or\
                                 (PY2 and isinstance(img_data, file)):
                             self.image_fp = img_data
