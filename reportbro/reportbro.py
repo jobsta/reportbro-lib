@@ -400,7 +400,7 @@ class FPDFRB(fpdf.FPDF):
             for additional_font in additional_fonts:
                 filename = additional_font.get('filename', '')
                 style_map = {'': '', 'B': 'B', 'I': 'I', 'BI': 'BI'}
-                font = dict(standard_font=False, added=False, regular_filename=filename,
+                font = dict(standard_font=False, added={}, regular_filename=filename,
                         bold_filename=additional_font.get('bold_filename', filename),
                         italic_filename=additional_font.get('italic_filename', filename),
                         bold_italic_filename=additional_font.get('bold_italic_filename', filename),
@@ -437,10 +437,10 @@ class FPDFRB(fpdf.FPDF):
                     # replace of 'U' is needed because it is set for underlined text
                     # when called from FPDF.add_page
                     style = font['style_map'].get(style.replace('U', ''))
-                if not font['added']:
+                if not font['added'].get(family + '_' + style):
                     filename = font['style2filename'].get(style)
                     self.add_font(family, style=style, fname=filename, uni=font['uni'])
-                    font['added'] = True
+                    font['added'][family + '_' + style] = True
             if underline:
                 style += 'U'
             fpdf.FPDF.set_font(self, family, style, size)
