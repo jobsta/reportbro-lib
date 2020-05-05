@@ -1,5 +1,11 @@
 # Changelog
 
+## [Upcoming Release]
+
+### Bug Fixes
+* parameter for image source can now also be part of a collection parameter
+* fix usage of additional font when multiple font files are set for different styles
+
 ## [1.4.0] - 2020-04-20
 
 ### Changes
