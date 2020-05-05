@@ -400,28 +400,38 @@ class FPDFRB(fpdf.FPDF):
         if additional_fonts:
             for additional_font in additional_fonts:
                 filename = additional_font.get('filename', '')
-                style_map = {'': '', 'B': 'B', 'I': 'I', 'BI': 'BI'}
-                font = dict(standard_font=False, added=False, regular_filename=filename,
-                        bold_filename=additional_font.get('bold_filename', filename),
-                        italic_filename=additional_font.get('italic_filename', filename),
-                        bold_italic_filename=additional_font.get('bold_italic_filename', filename),
-                        style_map=style_map, uni=additional_font.get('uni', True))
+                font = dict(
+                    standard_font=False, uni=additional_font.get('uni', True))
+
+                regular_style = dict(
+                    font_filename=filename, style='', font_added=False)
+                bold_style = dict(
+                    font_filename=additional_font.get('bold_filename', filename),
+                    style='B', font_added=False)
+                italic_style = dict(
+                    font_filename=additional_font.get('italic_filename', filename),
+                    style='I', font_added=False)
+                bold_italic_style = dict(
+                    font_filename=additional_font.get('bold_italic_filename', filename),
+                    style='BI', font_added=False)
+
                 # map styles in case there are no separate font-files for bold, italic or bold italic
                 # to avoid adding the same font multiple times to the pdf document
-                if font['bold_filename'] == font['regular_filename']:
-                    style_map['B'] = ''
-                if font['italic_filename'] == font['bold_filename']:
-                    style_map['I'] = style_map['B']
-                elif font['italic_filename'] == font['regular_filename']:
-                    style_map['I'] = ''
-                if font['bold_italic_filename'] == font['italic_filename']:
-                    style_map['BI'] = style_map['I']
-                elif font['bold_italic_filename'] == font['bold_filename']:
-                    style_map['BI'] = style_map['B']
-                elif font['bold_italic_filename'] == font['regular_filename']:
-                    style_map['BI'] = ''
-                font['style2filename'] = {'': filename, 'B': font['bold_filename'],
-                        'I': font['italic_filename'], 'BI': font['bold_italic_filename']}
+                if bold_style['font_filename'] == regular_style['font_filename']:
+                    bold_style = regular_style
+                if italic_style['font_filename'] == regular_style['font_filename']:
+                    italic_style = regular_style
+                if bold_italic_style['font_filename'] == italic_style['font_filename']:
+                    bold_italic_style = italic_style
+                elif bold_italic_style['font_filename'] == bold_style['font_filename']:
+                    bold_italic_style = bold_style
+                elif bold_italic_style['font_filename'] == regular_style['font_filename']:
+                    bold_italic_style = regular_style
+                font['style'] = regular_style
+                font['styleB'] = bold_style
+                font['styleI'] = italic_style
+                font['styleBI'] = bold_italic_style
+
                 self.available_fonts[additional_font.get('value', '')] = font
 
     def add_image(self, img, image_key):
@@ -434,14 +444,22 @@ class FPDFRB(fpdf.FPDF):
         font = self.available_fonts.get(family)
         if font:
             if not font['standard_font']:
+                # get font for specific style
                 if style:
                     # replace of 'U' is needed because it is set for underlined text
                     # when called from FPDF.add_page
-                    style = font['style_map'].get(style.replace('U', ''))
-                if not font['added']:
-                    filename = font['style2filename'].get(style)
-                    self.add_font(family, style=style, fname=filename, uni=font['uni'])
-                    font['added'] = True
+                    style_font = font['style' + style.replace('U', '')]
+                    # style could be different in case styles are mapped,
+                    # e.g. if bold style has same font file as regular style
+                    style = style_font['style']
+                else:
+                    style_font = font['style']
+
+                if not style_font['font_added']:
+                    self.add_font(
+                        family, style=style, fname=style_font['font_filename'], uni=font['uni'])
+                    style_font['font_added'] = True
+
             if underline:
                 style += 'U'
             fpdf.FPDF.set_font(self, family, style, size)
