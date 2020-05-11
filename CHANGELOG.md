@@ -2,6 +2,9 @@
 
 ## [Upcoming Release]
 
+### Changes
+* Evaluate parameters inside list
+
 ### Bug Fixes
 * parameter for image source can now also be part of a collection parameter
 * fix usage of additional font when multiple font files are set for different styles
