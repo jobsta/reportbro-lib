@@ -1,4 +1,5 @@
 from __future__ import division
+import datetime
 import sys
 
 
@@ -36,6 +37,16 @@ def to_string(val):
         if not isinstance(val, str):
             return str(val)
     return val
+
+
+def parse_datetime_string(val):
+    date_format = '%Y-%m-%d'
+    colon_count = val.count(':')
+    if colon_count == 1:
+        date_format = '%Y-%m-%d %H:%M'
+    elif colon_count == 2:
+        date_format = '%Y-%m-%d %H:%M:%S'
+    return datetime.datetime.strptime(val, date_format)
 
 
 # return image size so image fits into configured width/height and keep aspect ratio

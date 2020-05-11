@@ -50,6 +50,10 @@ class Parameter:
                     self.children.append(parameter)
                     self.fields[parameter.name] = parameter
 
+    def is_evaluated(self):
+        """Return True if parameter data must be evaluated initially."""
+        return self.eval or self.type in (ParameterType.average, ParameterType.sum)
+
 
 class BorderStyle:
     def __init__(self, data, key_prefix=''):

@@ -813,7 +813,6 @@ class TableElement(DocElement):
 
         self.row_count = len(self.rows)
         self.row_index = 0
-        self.row_number = 0
 
         if only_verify:
             if self.print_header:
@@ -855,8 +854,6 @@ class TableElement(DocElement):
                 self.print_header = False
 
         while self.row_index < self.row_count:
-            self.row_number += 1
-            self.rows[self.row_index]['row_number'] = self.row_number
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
 
@@ -1249,7 +1246,6 @@ class SectionElement(DocElement):
         self.rows = []
         self.row_count = 0
         self.row_index = -1
-        self.row_number = 0
 
     def prepare(self, ctx, pdf_doc, only_verify):
         parameter_name = Context.strip_parameter_name(self.data_source)
@@ -1278,8 +1274,6 @@ class SectionElement(DocElement):
             if self.header:
                 self.header.prepare(ctx, pdf_doc=None, only_verify=True)
             while self.row_index < self.row_count:
-                self.row_number += 1
-                self.rows[self.row_index]['row_number'] = self.row_number
                 # push data context of current row so values of current row can be accessed
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
                 self.content.prepare(ctx, pdf_doc=None, only_verify=True)
@@ -1302,8 +1296,6 @@ class SectionElement(DocElement):
                 self.print_header = False
 
         while self.row_index < self.row_count:
-            self.row_number += 1
-            self.rows[self.row_index]['row_number'] = self.row_number
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
             self.content.create_render_elements(offset_y + render_element.height, container_height, ctx, pdf_doc)
@@ -1330,8 +1322,6 @@ class SectionElement(DocElement):
             row, _ = self.header.container.render_spreadsheet(row, col, ctx, renderer)
 
         while self.row_index < self.row_count:
-            self.row_number += 1
-            self.rows[self.row_index]['row_number'] = self.row_number
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
             self.content.container.prepare(ctx, pdf_doc=None)

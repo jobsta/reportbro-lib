@@ -28,7 +28,7 @@ from .containers import ReportBand
 from .elements import *
 from .enums import *
 from .structs import Parameter, TextStyle
-from .utils import get_int_value, PY3
+from .utils import get_int_value, parse_datetime_string, PY3
 
 
 try:
@@ -555,12 +555,11 @@ class Report:
 
         self.images = dict()  # cached image data
 
-        computed_parameters = []
         self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
-                          is_test_data=is_test_data, computed_parameters=computed_parameters, parents=[])
+                          is_test_data=is_test_data, parents=[])
         try:
             if not self.errors:
-                self.compute_parameters(computed_parameters, self.data)
+                self.evaluate_parameters(parameter_list, self.data)
         except ReportBroError as err:
             self.errors.append(err.error)
 
@@ -645,13 +644,7 @@ class Report:
                     value = None if parameter.nullable else datetime.datetime.now()
                 else:
                     try:
-                        format = '%Y-%m-%d'
-                        colon_count = value.count(':')
-                        if colon_count == 1:
-                            format = '%Y-%m-%d %H:%M'
-                        elif colon_count == 2:
-                            format = '%Y-%m-%d %H:%M:%S'
-                        value = datetime.datetime.strptime(value, format)
+                        value = parse_datetime_string(value)
                     except (ValueError, TypeError):
                         if parent_id and is_test_data:
                             self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
@@ -673,7 +666,7 @@ class Report:
                 value = datetime.datetime.now()
         return value
 
-    def process_data(self, dest_data, src_data, parameters, is_test_data, computed_parameters, parents):
+    def process_data(self, dest_data, src_data, parameters, is_test_data, parents):
         field = 'test_data' if is_test_data else 'type'
         parent_id = parents[-1].id if parents else None
         for parameter in parameters:
@@ -683,16 +676,7 @@ class Report:
                 self.errors.append(Error('errorMsgInvalidParameterName',
                                          object_id=parameter.id, field='name', info=parameter.name))
             parameter_type = parameter.type
-            if parameter_type in (ParameterType.average, ParameterType.sum) or parameter.eval:
-                if not parameter.expression:
-                    self.errors.append(Error('errorMsgMissingExpression',
-                                             object_id=parameter.id, field='expression', context=parameter.name))
-                else:
-                    parent_names = []
-                    for parent in parents:
-                        parent_names.append(parent.name)
-                    computed_parameters.append(dict(parameter=parameter, parent_names=parent_names))
-            else:
+            if not parameter.is_evaluated():
                 value = src_data.get(parameter.name)
                 if parameter_type in (ParameterType.string, ParameterType.number,
                                       ParameterType.boolean, ParameterType.date):
@@ -705,12 +689,13 @@ class Report:
                             # create new list which will be assigned to dest_data to keep src_data unmodified
                             dest_array = []
 
-                            for row in value:
+                            for row_number, row in enumerate(value, start=1):
                                 dest_array_item = dict()
                                 self.process_data(
                                     dest_data=dest_array_item, src_data=row, parameters=parameter_list,
-                                    is_test_data=is_test_data, computed_parameters=computed_parameters,
-                                    parents=parents)
+                                    is_test_data=is_test_data, parents=parents)
+                                # set value for internal parameter 'row_number'
+                                dest_array_item['row_number'] = row_number
                                 dest_array.append(dest_array_item)
                             parents = parents[:-1]
                             value = dest_array
@@ -718,8 +703,9 @@ class Report:
                             if not parameter.nullable:
                                 value = []
                         else:
-                            self.errors.append(Error('errorMsgInvalidArray',
-                                                     object_id=parameter.id, field=field, context=parameter.name))
+                            self.errors.append(Error(
+                                'errorMsgInvalidArray',
+                                object_id=parameter.id, field=field, context=parameter.name))
                     elif parameter_type == ParameterType.simple_array:
                         if isinstance(value, list):
                             list_values = []
@@ -732,8 +718,9 @@ class Report:
                             if not parameter.nullable:
                                 value = []
                         else:
-                            self.errors.append(Error('errorMsgInvalidArray',
-                                                     object_id=parameter.id, field=field, context=parameter.name))
+                            self.errors.append(Error(
+                                'errorMsgInvalidArray',
+                                object_id=parameter.id, field=field, context=parameter.name))
                     elif parameter_type == ParameterType.map:
                         if value is None and not parameter.nullable:
                             value = dict()
@@ -745,58 +732,138 @@ class Report:
 
                                 self.process_data(
                                     dest_data=dest_map, src_data=value, parameters=parameter.children,
-                                    is_test_data=is_test_data, computed_parameters=computed_parameters,
-                                    parents=parents)
+                                    is_test_data=is_test_data, parents=parents)
                                 parents = parents[:-1]
                                 value = dest_map
                             else:
-                                self.errors.append(Error('errorMsgInvalidMap',
-                                                         object_id=parameter.id, field='type', context=parameter.name))
+                                self.errors.append(Error(
+                                    'errorMsgInvalidMap',
+                                    object_id=parameter.id, field='type', context=parameter.name))
                         else:
-                            self.errors.append(Error('errorMsgMissingData',
-                                                     object_id=parameter.id, field='name', context=parameter.name))
+                            self.errors.append(Error(
+                                'errorMsgMissingData',
+                                object_id=parameter.id, field='name', context=parameter.name))
                 dest_data[parameter.name] = value
 
-    def compute_parameters(self, computed_parameters, data):
-        for computed_parameter in computed_parameters:
-            parameter = computed_parameter['parameter']
-            value = None
-            if parameter.type in (ParameterType.average, ParameterType.sum):
-                expr = Context.strip_parameter_name(parameter.expression)
-                pos = expr.find('.')
-                if pos == -1:
-                    self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                            object_id=parameter.id, field='expression', context=parameter.name))
-                else:
-                    parameter_name = expr[:pos]
-                    parameter_field = expr[pos+1:]
-                    items = data.get(parameter_name)
-                    if not isinstance(items, list):
-                        self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                                object_id=parameter.id, field='expression', context=parameter.name))
-                    else:
-                        total = decimal.Decimal(0)
-                        for item in items:
-                            item_value = item.get(parameter_field)
-                            if not isinstance(item_value, decimal.Decimal):
-                                self.errors.append(Error('errorMsgInvalidAvgSumExpression',
-                                        object_id=parameter.id, field='expression', context=parameter.name))
-                                break
-                            total += item_value
-                        if parameter.type == ParameterType.average:
-                            value = total / len(items)
-                        elif parameter.type == ParameterType.sum:
-                            value = total
-            else:
-                value = self.context.evaluate_expression(parameter.expression, parameter.id, field='expression')
+    def evaluate_parameters(self, parameters, data):
+        for parameter in parameters:
+            if not parameter.is_internal:
+                if parameter.is_evaluated():
+                    self.evaluate_parameter_expr(parameter, data)
+                elif parameter.type == ParameterType.map:
+                    for field in parameter.children:
+                        if field.is_evaluated():
+                            # set dest_data so evaluated expression is set in map
+                            self.evaluate_parameter_expr(field, data, dest_data=data[parameter.name])
+                elif parameter.type == ParameterType.array:
+                    eval_fields = []
+                    for field in parameter.children:
+                        if field.eval:
+                            eval_fields.append(field)
+                    if eval_fields:
+                        param_ref = self.context.get_parameter(parameter.name)
+                        if param_ref is not None:
+                            rows, data_exists = Context.get_parameter_data(param_ref)
+                            if data_exists:
+                                row_parameters = dict()
+                                for row_parameter in parameter.children:
+                                    row_parameters[row_parameter.name] = row_parameter
 
-            data_entry = data
-            valid = True
-            for parent_name in computed_parameter['parent_names']:
-                data_entry = data_entry.get(parent_name)
-                if not isinstance(data_entry, dict):
-                    self.errors.append(Error('errorMsgInvalidParameterData',
-                            object_id=parameter.id, field='name', context=parameter.name))
-                    valid = False
-            if valid:
-                data_entry[parameter.name] = value
+                                for row in rows:
+                                    self.context.push_context(row_parameters, row)
+                                    for field in eval_fields:
+                                        self.evaluate_parameter_expr(field, row)
+                                    self.context.pop_context()
+
+    def evaluate_parameter_expr(self, parameter, data, dest_data=None):
+        if not parameter.expression:
+            self.errors.append(Error(
+                'errorMsgMissingExpression',
+                object_id=parameter.id, field='expression', context=parameter.name))
+            return
+
+        parameter_type = parameter.type
+        if parameter_type in (ParameterType.average, ParameterType.sum):
+            self.evaluate_parameter_func(parameter, data, dest_data=dest_data)
+        else:
+            value = self.context.evaluate_expression(
+                parameter.expression, parameter.id, field='expression')
+            valid_value = False
+            if parameter_type == ParameterType.string:
+                if isinstance(value, basestring):
+                    valid_value = True
+            elif parameter_type == ParameterType.number:
+                if isinstance(value, decimal.Decimal):
+                    valid_value = True
+                elif isinstance(value, (int, long, float)):
+                    value = decimal.Decimal(value)
+                    valid_value = True
+            elif parameter_type == ParameterType.boolean:
+                if isinstance(value, bool):
+                    valid_value = True
+            elif parameter_type == ParameterType.date:
+                if isinstance(value, basestring):
+                    try:
+                        value = parse_datetime_string(value)
+                    except (ValueError, TypeError):
+                        self.errors.append(Error(
+                            'errorMsgInvalidExpressionType',
+                            object_id=parameter.id, field='expression', context=parameter.name))
+                    valid_value = True
+                elif isinstance(value, datetime.date):
+                    valid_value = True
+                    if not isinstance(value, datetime.datetime):
+                        value = datetime.datetime(value.year, value.month, value.day)
+
+            if valid_value:
+                if dest_data is not None:
+                    dest_data[parameter.name] = value
+                else:
+                    data[parameter.name] = value
+            else:
+                self.errors.append(Error(
+                    'errorMsgInvalidExpressionType',
+                    object_id=parameter.id, field='expression', context=parameter.name))
+
+    def evaluate_parameter_func(self, parameter, data, dest_data):
+        expr = Context.strip_parameter_name(parameter.expression)
+        pos = expr.find('.')
+        if pos == -1:
+            self.errors.append(Error(
+                'errorMsgInvalidAvgSumExpression',
+                object_id=parameter.id, field='expression', context=parameter.name))
+        else:
+            parameter_name = expr[:pos]
+            parameter_field = expr[pos+1:]
+            param_ref = self.context.get_parameter(parameter_name)
+            if param_ref is None or param_ref.parameter.type != ParameterType.array:
+                self.errors.append(Error(
+                    'errorMsgInvalidAvgSumExpression',
+                    object_id=parameter.id, field='expression', context=parameter.name))
+            else:
+                total = decimal.Decimal(0)
+                items, data_exists = self.context.get_parameter_data(param_ref)
+                if not data_exists or not isinstance(items, list):
+                    self.errors.append(Error(
+                        'errorMsgInvalidAvgSumExpression',
+                        object_id=parameter.id, field='expression',
+                        context=parameter.name))
+
+                for item in items:
+                    item_value = item.get(parameter_field)
+                    if not isinstance(item_value, decimal.Decimal):
+                        self.errors.append(Error(
+                            'errorMsgInvalidAvgSumExpression',
+                            object_id=parameter.id, field='expression',
+                            context=parameter.name))
+                        break
+                    total += item_value
+                value = None
+                if parameter.type == ParameterType.average:
+                    value = total / len(items)
+                elif parameter.type == ParameterType.sum:
+                    value = total
+                if dest_data is not None:
+                    dest_data[parameter.name] = value
+                else:
+                    data[parameter.name] = value
