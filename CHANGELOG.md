@@ -3,7 +3,9 @@
 ## [Upcoming Release]
 
 ### Changes
-* Evaluate parameters inside list
+* evaluate parameters inside list
+* add encode_error_handling setting to define behavior when a character cannot be
+encoded with the core fonts encoding
 
 ### Bug Fixes
 * parameter for image source can now also be part of a collection parameter
