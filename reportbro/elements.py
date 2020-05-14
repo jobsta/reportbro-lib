@@ -228,6 +228,7 @@ class TextElement(DocElement):
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
+        self.spreadsheet_text_wrap = bool(data.get('spreadsheet_textWrap'))
         self.text_height = 0
         self.line_index = -1
         self.line_height = 0
@@ -454,6 +455,8 @@ class TextElement(DocElement):
                     format_props['right'] = 1
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
+            if self.spreadsheet_text_wrap:
+                format_props['text_wrap'] = True
             if format_props:
                 cell_format = renderer.add_format(format_props)
                 if isinstance(self, TableTextElement):
