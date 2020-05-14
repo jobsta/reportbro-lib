@@ -2,6 +2,9 @@
 
 ## [Upcoming Release]
 
+### Features
+* support text wrap in spreadsheet cell
+
 ### Changes
 * evaluate parameters inside list
 * add encode_error_handling setting to define behavior when a character cannot be
