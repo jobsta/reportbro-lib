@@ -44,12 +44,14 @@ regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
 
 class DocumentPDFRenderer:
     def __init__(self, header_band, content_band, footer_band, report, context,
-                 additional_fonts, filename, add_watermark, page_limit):
+                 additional_fonts, filename, add_watermark, page_limit, encode_error_handling):
         self.header_band = header_band
         self.content_band = content_band
         self.footer_band = footer_band
         self.document_properties = report.document_properties
-        self.pdf_doc = FPDFRB(report.document_properties, additional_fonts=additional_fonts)
+        self.pdf_doc = FPDFRB(
+            report.document_properties, additional_fonts=additional_fonts,
+            encode_error_handling=encode_error_handling)
         self.pdf_doc.set_margins(0, 0)
         self.pdf_doc.c_margin = 0  # interior cell margin
         self.context = context
@@ -100,10 +102,11 @@ class DocumentPDFRenderer:
             self.add_page()
             if self.add_watermark:
                 if watermark_height < self.document_properties.page_height:
-                    self.pdf_doc.image(watermark_filename,
-                            self.document_properties.page_width / 2 - watermark_width / 2,
-                            self.document_properties.page_height - watermark_height,
-                            watermark_width, watermark_height)
+                    self.pdf_doc.image(
+                        watermark_filename,
+                        self.document_properties.page_width / 2 - watermark_width / 2,
+                        self.document_properties.page_height - watermark_height,
+                        watermark_width, watermark_height)
 
             content_offset_y = self.document_properties.margin_top
             page_number = self.context.get_page_number()
@@ -381,7 +384,7 @@ class ImageData:
 
 
 class FPDFRB(fpdf.FPDF):
-    def __init__(self, document_properties, additional_fonts):
+    def __init__(self, document_properties, additional_fonts, encode_error_handling):
         if document_properties.orientation == Orientation.portrait:
             orientation = 'P'
             dimension = (document_properties.page_width, document_properties.page_height)
@@ -392,6 +395,7 @@ class FPDFRB(fpdf.FPDF):
         self.x = 0
         self.y = 0
         self.set_doc_option('core_fonts_encoding', 'windows-1252')
+        self.set_doc_option('encode_error_handling', encode_error_handling)
         self.loaded_images = dict()
         self.available_fonts = dict(
             courier=dict(standard_font=True),
@@ -467,9 +471,34 @@ class FPDFRB(fpdf.FPDF):
 
 class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,
-                 page_limit=10000, request_headers=None):
+                 page_limit=10000, request_headers=None, encode_error_handling='strict'):
+        """Create Report instance which can then be used to generate pdf and xlsx reports.
+
+        :param report_definition: The report object containg report elements, parameters,
+        styles and document properties. This object can be obtained in
+        ReportBro Designer by using getReport method.
+        :param data: Dictionary containing all data for the report.
+        This structure must correspond with the defined parameters
+        in the report_definition (parameter name and type).
+        :param is_test_data: set to True in case the given data contains test data which
+        is specified within the parameters in ReportBro Designer. Set to False if
+        the data comes from your web application. This setting influences the
+        error messages in case report generation fails due to invalid data.
+        :param additional_fonts: In case additional (non-standard) fonts are used they
+        must be made available so they can be embedded into the pdf file.
+        :param page_limit: maximum number of pages for pdf reports. This can
+        be used to avoid reports getting too big or taking too long for generation.
+        If set to 0 or None then no page limit is used.
+        :param request_headers: request headers used when images are fetched by url
+        :param encode_error_handling: defines behaviour when a character cannot
+        be encoded with the encoding used for the core fonts. The following options exist:
+        - 'strict': raise a UnicodeDecodeError exception
+        - 'ignore': just leave the character out of the result
+        - 'replace': use U+FFFD replacement character
+        """
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
+        assert encode_error_handling in ('strict', 'ignore', 'replace')
 
         self.errors = []
 
@@ -487,6 +516,7 @@ class Report:
 
         self.additional_fonts = additional_fonts
         self.page_limit = page_limit
+        self.encode_error_handling = encode_error_handling
         # request headers used when fetching images by url (some sites check for existance
         # of user-agent header and do not return image otherwise)
         self.request_headers = {'User-Agent': 'Mozilla/5.0'}
@@ -573,11 +603,11 @@ class Report:
         return self.images.get(image_key)
 
     def generate_pdf(self, filename='', add_watermark=False):
-        renderer = DocumentPDFRenderer(header_band=self.header,
-                content_band=self.content, footer_band=self.footer,
-                report=self, context=self.context,
-                additional_fonts=self.additional_fonts,
-                filename=filename, add_watermark=add_watermark, page_limit=self.page_limit)
+        renderer = DocumentPDFRenderer(
+            header_band=self.header, content_band=self.content, footer_band=self.footer,
+            report=self, context=self.context, additional_fonts=self.additional_fonts,
+            filename=filename, add_watermark=add_watermark, page_limit=self.page_limit,
+            encode_error_handling=self.encode_error_handling)
         return renderer.render()
 
     def generate_xlsx(self, filename=''):
