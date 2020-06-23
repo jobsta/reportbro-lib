@@ -87,7 +87,7 @@ class DocumentPDFRenderer:
             if self.document_properties.footer_display == BandDisplay.always or\
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_count != 1):
                 height -= self.document_properties.footer_size
-            complete = self.content_band.create_render_elements(height, self.context, self.pdf_doc)
+            complete = self.content_band.create_render_elements(0, height, self.context, self.pdf_doc)
             if complete:
                 break
             page_count += 1
@@ -114,15 +114,15 @@ class DocumentPDFRenderer:
                     (self.document_properties.header_display == BandDisplay.not_on_first_page and page_number != 1):
                 content_offset_y += self.document_properties.header_size
                 self.header_band.prepare(self.context, self.pdf_doc)
-                self.header_band.create_render_elements(self.document_properties.header_size,
-                        self.context, self.pdf_doc)
+                self.header_band.create_render_elements(
+                    0, self.document_properties.header_size, self.context, self.pdf_doc)
                 self.header_band.render_pdf(self.document_properties.margin_left,
                     self.document_properties.margin_top, self.pdf_doc)
             if self.document_properties.footer_display == BandDisplay.always or\
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_number != 1):
                 self.footer_band.prepare(self.context, self.pdf_doc)
-                self.footer_band.create_render_elements(self.document_properties.footer_size,
-                        self.context, self.pdf_doc)
+                self.footer_band.create_render_elements(
+                    0, self.document_properties.footer_size, self.context, self.pdf_doc)
                 self.footer_band.render_pdf(self.document_properties.margin_left, footer_offset_y, self.pdf_doc)
 
             self.content_band.render_pdf(self.document_properties.margin_left, content_offset_y, self.pdf_doc, cleanup=True)
@@ -199,6 +199,9 @@ class DocumentXLSXRenderer:
 
     def add_format(self, format_props):
         return self.workbook.add_format(format_props)
+
+    def set_row(self, row, cell_format):
+        self.worksheet.set_row(row, cell_format=cell_format)
 
 
 class DocumentProperties:

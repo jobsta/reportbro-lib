@@ -69,6 +69,7 @@ class BorderStyle:
 class TextStyle(BorderStyle):
     def __init__(self, data, key_prefix=''):
         BorderStyle.__init__(self, data, key_prefix)
+        self.id = str(get_int_value(data, 'id'))
         self.bold = bool(data.get(key_prefix + 'bold'))
         self.italic = bool(data.get(key_prefix + 'italic'))
         self.underline = bool(data.get(key_prefix + 'underline'))

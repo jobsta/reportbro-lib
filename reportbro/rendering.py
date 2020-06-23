@@ -1,4 +1,5 @@
 from __future__ import division
+from .context import Context
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError
@@ -97,93 +98,88 @@ class BarCodeRenderElement(DocElementBase):
 
 
 class TableRenderElement(DocElementBase):
-    def __init__(self, report, x, width, render_y, table):
+    def __init__(self, report, table, render_y):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
-        self.x = x
-        self.width = width
+        self.table = table
+        self.x = table.x
+        self.width = table.width
         self.render_y = render_y
         self.render_bottom = render_y
-        self.table = table
-        self.rows = []
+        self.height = 0
+        self.bands = []
         self.complete = False
 
-    def add_rows(self, rows, allow_split, available_height, offset_y, container_height, ctx, pdf_doc):
-        rows_added = 0
-        if not self.complete:
-            if not allow_split:
-                height = 0
-                for row in rows:
-                    height += row.height
-                if height <= available_height:
-                    for row in rows:
-                        row.create_render_elements(offset_y=offset_y, container_height=container_height,
-                                ctx=ctx, pdf_doc=pdf_doc)
-                    self.rows.extend(rows)
-                    rows_added = len(rows)
-                    available_height -= height
-                    self.height += height
-                    self.render_bottom += height
-                else:
-                    self.complete = True
-            else:
-                for row in rows:
-                    if row.height <= available_height:
-                        row.create_render_elements(offset_y=offset_y, container_height=container_height,
-                                ctx=ctx, pdf_doc=pdf_doc)
-                        self.rows.append(row)
-                        rows_added += 1
-                        available_height -= row.height
-                        self.height += row.height
-                        self.render_bottom += row.height
-                    else:
-                        self.complete = True
-                        break
-        return rows_added
-
     def is_empty(self):
-        return len(self.rows) == 0
+        return len(self.bands) == 0
+
+    def add_band(self, band, row_index=-1):
+        if band.rendering_complete or not band.always_print_on_same_page:
+            band_height = band.get_used_band_height()
+            background_color = band.background_color
+            if band.band_type == BandType.content and not band.alternate_background_color.transparent and\
+                    row_index % 2 == 1:
+                background_color = band.alternate_background_color
+
+            self.bands.append(dict(
+                height=band_height, background_color=background_color,
+                elements=list(band.get_render_elements()), cells=band.printed_cells))
+            self.height += band_height
+            self.render_bottom += band_height
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        y = container_offset_y
-        for row in self.rows:
-            row.render_pdf(container_offset_x=container_offset_x + self.x, container_offset_y=y, pdf_doc=pdf_doc)
-            y += row.height
+        x = self.x + container_offset_x
+        x1 = x
+        x2 = x1 + self.width
+        y = self.render_y + container_offset_y
+        row_y = y
+        for band in self.bands:
+            background_color = band['background_color']
+            if not background_color.transparent:
+                pdf_doc.set_fill_color(
+                    background_color.r, background_color.g, background_color.b)
+                pdf_doc.rect(x, row_y, self.width, band['height'], style='F')
 
-        if self.rows and self.table.border != Border.none:
-            pdf_doc.set_draw_color(self.table.border_color.r, self.table.border_color.g, self.table.border_color.b)
+            for element in band['elements']:
+                element.render_pdf(container_offset_x=x, container_offset_y=row_y, pdf_doc=pdf_doc)
+            row_y += band['height']
+
+        if not self.is_empty() and self.table.border != Border.none:
+            pdf_doc.set_draw_color(
+                self.table.border_color.r, self.table.border_color.g, self.table.border_color.b)
             pdf_doc.set_line_width(self.table.border_width)
             half_border_width = self.table.border_width / 2
-            x1 = container_offset_x + self.x
-            x2 = x1 + self.rows[0].get_width()
             x1 += half_border_width
             x2 -= half_border_width
-            y1 = self.rows[0].get_render_y() + container_offset_y
-            y2 = y1 + (y - container_offset_y)
+            y1 = y
+            y2 = row_y
             if self.table.border in (Border.grid, Border.frame_row, Border.frame):
+                # draw left and right table borders
                 pdf_doc.line(x1, y1, x1, y2)
                 pdf_doc.line(x2, y1, x2, y2)
             y = y1
             pdf_doc.line(x1, y1, x2, y1)
             if self.table.border != Border.frame:
-                for row in self.rows[:-1]:
-                    y += row.height
+                # draw lines between table rows
+                for band in self.bands[:-1]:
+                    y += band['height']
                     pdf_doc.line(x1, y, x2, y)
             pdf_doc.line(x1, y2, x2, y2)
             if self.table.border == Border.grid:
-                columns = self.rows[0].column_data
-                # add half border_width so border is drawn inside right column and can be aligned with
-                # borders of other elements outside the table
+                # draw lines between table columns
+                cells = self.bands[0]['cells']
+                # add half border_width so border is drawn inside right cell and
+                # can be aligned with borders of other elements outside the table
                 x = x1
-                y2 = y1 + self.rows[0].height
+                y2 = y1 + self.bands[0]['height']
 
-                # rows can have different columns (colspan) than other rows so
-                # we draw column borders separately if necessary
-                for row in self.rows[1:]:
-                    current_columns = row.column_data
+                # rows can have different cells (colspan) than other rows so
+                # we draw cell borders separately if necessary
+                for band in self.bands[1:]:
+                    current_cells = band['cells']
                     same_borders = True
-                    if len(columns) == len(current_columns):
-                        for (col1, col2) in zip(columns, current_columns):
+                    if len(cells) == len(current_cells):
+                        for (col1, col2) in zip(cells, current_cells):
                             if col1.width != col2.width:
                                 same_borders = False
                                 break
@@ -191,17 +187,22 @@ class TableRenderElement(DocElementBase):
                         same_borders = False
                     if not same_borders:
                         x = x1
-                        for column in columns[:-1]:
-                            x += column.width
+                        for cell in cells[:-1]:
+                            x += cell.width
                             pdf_doc.line(x, y1, x, y2)
                         y1 = y2
                         x = x1
-                        columns = current_columns
-                    y2 += row.height
+                        cells = current_cells
+                    y2 += band['height']
 
-                for column in columns[:-1]:
-                    x += column.width
+                for cell in cells[:-1]:
+                    x += cell.width
                     pdf_doc.line(x, y1, x, y2)
+
+    def cleanup(self):
+        for band in self.bands:
+            for element in band['elements']:
+                element.cleanup()
 
 
 class FrameRenderElement(DocElementBase):

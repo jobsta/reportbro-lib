@@ -10,7 +10,8 @@ class Container(object):
         self.doc_elements = []  # type: List[DocElementBase]
         self.width = 0
         self.height = 0
-        containers[self.id] = self
+        if containers is not None:
+            containers[self.id] = self
 
         self.allow_page_break = True
         self.container_offset_y = 0
@@ -67,7 +68,7 @@ class Container(object):
                 bottom = render_element.render_bottom
         return bottom
 
-    def create_render_elements(self, container_height, ctx, pdf_doc):
+    def create_render_elements(self, container_top, container_height, ctx, pdf_doc):
         i = 0
         new_page = False
         processed_elements = []
@@ -113,7 +114,8 @@ class Container(object):
                             new_page = True
                         if not new_page:
                             render_elem, complete = elem.get_next_render_element(
-                                offset_y, container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
+                                offset_y, container_top=container_top,
+                                container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
                             if render_elem:
                                 if complete:
                                     processed_elements.append(elem)

@@ -3,6 +3,7 @@
 ## [Upcoming Release]
 
 ### Features
+* support option to expand column width
 * support text wrap in spreadsheet cell
 
 ### Changes
