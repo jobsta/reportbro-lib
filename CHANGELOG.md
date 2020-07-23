@@ -2,6 +2,11 @@
 
 ## [Upcoming Release]
 
+### Bug Fixes
+*  fix rendering issues of text elements inside table or section
+
+## [1.5.0] - 2020-07-15
+
 ### Features
 * support option to expand column width
 * support option to force page break for each new group in a table
