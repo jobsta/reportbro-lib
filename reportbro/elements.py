@@ -314,6 +314,8 @@ class TextElement(DocElement):
             self.lines_count = len(lines)
             if self.lines_count > 0:
                 self.text_height = (len(lines) - 1) * self.line_height + self.used_style.font_size
+            else:
+                self.text_height = 0
             self.line_index = 0
             for line in lines:
                 self.text_lines.append(TextLine(
