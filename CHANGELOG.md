@@ -1,9 +1,9 @@
 # Changelog
 
-## [Upcoming Release]
+## [1.5.1] - 2020-07-27
 
 ### Bug Fixes
-*  fix rendering issues of text elements inside table or section
+* fix rendering issues of text elements inside table or section
 
 ## [1.5.0] - 2020-07-15
 
