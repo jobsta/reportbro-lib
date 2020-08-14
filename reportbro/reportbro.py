@@ -310,7 +310,7 @@ class ImageData:
                                 (PY2 and isinstance(img_data, file)):
                             self.image_fp = img_data
                             pos = img_data.name.rfind('.')
-                            self.image_type = img_data.name[pos+1:] if pos != -1 else ''
+                            self.image_type = img_data.name[pos+1:].lower() if pos != -1 else ''
                         elif isinstance(img_data, basestring):
                             img_data_b64 = img_data
                     else:
@@ -343,7 +343,7 @@ class ImageData:
                     else:
                         parse_result = urllib.parse.urlparse(image_url)
                     pos = parse_result.path.rfind('.')
-                    self.image_type = parse_result.path[pos+1:] if pos != -1 else ''
+                    self.image_type = parse_result.path[pos+1:].lower() if pos != -1 else ''
                 except ValueError as ex:
                     raise ReportBroError(
                         Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
@@ -352,7 +352,7 @@ class ImageData:
                 # and not from Reportbro Designer
                 image_path = image_uri[5:]
                 pos = image_uri.rfind('.')
-                self.image_type = image_uri[pos+1:] if pos != -1 else ''
+                self.image_type = image_uri[pos+1:].lower() if pos != -1 else ''
             else:
                 raise ReportBroError(
                     Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
