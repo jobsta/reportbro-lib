@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming Release
+
+### Changes
+* image type is compared case insensitive
+
 ## [1.5.1] - 2020-07-27
 
 ### Bug Fixes
