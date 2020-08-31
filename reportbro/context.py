@@ -13,8 +13,10 @@ from .enums import *
 from .errors import Error, ReportBroError
 
 
-# parameter instance and the data map referenced by the parameter
-ParameterRef = namedtuple('ParameterRef', ['parameter', 'data'])
+# parameter instance, the data map referenced by the parameter and the data map containing
+# the context_id (this is usually the data map but can be different for collection
+# parameters)
+ParameterRef = namedtuple('ParameterRef', ['parameter', 'data', 'data_context'])
 
 
 class Context:
@@ -56,15 +58,16 @@ class Context:
                 collection_name, parameters=self.parameters, data=self.data)
             if param_ref is not None and param_ref.parameter.type == ParameterType.map and\
                     field_name in param_ref.parameter.fields and collection_name in param_ref.data:
-                return ParameterRef(parameter=param_ref.parameter.fields[field_name],
-                                    data=param_ref.data[collection_name])
+                return ParameterRef(
+                    parameter=param_ref.parameter.fields[field_name],
+                    data=param_ref.data[collection_name], data_context=param_ref.data)
             return None
         else:
             return self._get_parameter(name, parameters=self.parameters, data=self.data)
 
     def _get_parameter(self, name, parameters, data):
         if name in parameters:
-            return ParameterRef(parameter=parameters[name], data=data)
+            return ParameterRef(parameter=parameters[name], data=data, data_context=data)
         elif parameters.get('__parent') and data.get('__parent'):
             return self._get_parameter(
                 name, parameters=parameters.get('__parent'), data=data.get('__parent'))
@@ -94,8 +97,8 @@ class Context:
         its data map referenced by the parameter.
         :return: unique context id or None if there is no context available.
         """
-        if param_ref.parameter.name in param_ref.data:
-            return param_ref.data['__context_id']
+        if '__context_id' in param_ref.data_context:
+            return param_ref.data_context['__context_id']
         return None
 
     def get_data(self, name, data=None):
