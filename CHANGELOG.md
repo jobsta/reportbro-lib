@@ -5,6 +5,9 @@
 ### Changes
 * image type is compared case insensitive
 
+### Bug Fixes
+* fix referencing image data inside collection
+
 ## [1.5.1] - 2020-07-27
 
 ### Bug Fixes
