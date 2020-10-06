@@ -74,7 +74,7 @@ class DocumentPDFRenderer:
                 self.add_watermark = False
             else:
                 watermark_width = self.document_properties.page_width / 3
-                watermark_height = watermark_width * (108 / 461)
+                watermark_height = watermark_width * (115 / 460)
 
         self.content_band.prepare(self.context, self.pdf_doc)
         page_count = 1
