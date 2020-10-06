@@ -1,9 +1,10 @@
 # Changelog
 
-## Upcoming Release
+## [1.5.2] - 2020-10-06
 
 ### Changes
 * image type is compared case insensitive
+* throw error if used font is not available
 
 ### Bug Fixes
 * fix referencing image data inside collection
