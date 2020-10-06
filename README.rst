@@ -25,7 +25,7 @@ Installation
 
     pip install reportbro-lib
 
-Go to https://www.reportbro.com/docs for more information on configuration and usage.
+Go to https://www.reportbro.com/doc/api#lib-arguments for more information on configuration and usage.
 
 Python Coding Style
 -------------------
@@ -41,10 +41,10 @@ License
 
 - Commercial license
 
-If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/buy.
+If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/license/index.
 
 - Open-source license
 
 If you are creating an open-source application under a license compatible with the `GNU AGPL license v3 <https://www.gnu.org/licenses/agpl-3.0.html>`_, you may use ReportBro under the terms of the AGPLv3.
 
-Read more about ReportBro's license options at https://www.reportbro.com/license.
+Read more about ReportBro's license options at https://www.reportbro.com/license/index.
