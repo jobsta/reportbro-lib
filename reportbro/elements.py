@@ -286,9 +286,11 @@ class TextElement(DocElement):
                 raise ReportBroError(
                     Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
+        use_cs_style = False
         if self.cs_condition:
             if ctx.evaluate_expression(self.cs_condition, self.id, field='cs_condition'):
                 self.used_style = self.conditional_style
+                use_cs_style = True
             else:
                 self.used_style = self.style
         else:
@@ -300,8 +302,13 @@ class TextElement(DocElement):
 
         self.text_lines = []
         if pdf_doc:
-            pdf_doc.set_font(self.used_style.font, self.used_style.font_style, self.used_style.font_size,
-                    underline=self.used_style.underline)
+            if not pdf_doc.set_font(
+                    self.used_style.font, self.used_style.font_style, self.used_style.font_size,
+                    underline=self.used_style.underline):
+                error_field = 'cs_font' if use_cs_style else 'font'
+                raise ReportBroError(
+                    Error('errorMsgFontNotAvailable', object_id=self.id, field=error_field))
+
             if content:
                 try:
                     lines = pdf_doc.multi_cell(available_width, 0, content, align=self.used_style.text_align, split_only=True)

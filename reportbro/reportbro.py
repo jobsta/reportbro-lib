@@ -448,6 +448,17 @@ class FPDFRB(fpdf.FPDF):
         return self.loaded_images.get(image_key)
 
     def set_font(self, family, style='', size=0, underline=False):
+        """Set font in underlying pdf renderer.
+
+        This font is used for all following text rendering calls until changed again.
+
+        :param family: name of the font which must either be one of the standard
+        fonts (courier, helvetica, times) or added to ReportBro instance with the
+        additional_fonts setting.
+        :param size: font size, if not set then the standard font size is used.
+        :param underline: True if text should be rendered with underlined style.
+        :return: True if font exists, False otherwise.
+        """
         font = self.available_fonts.get(family)
         if font:
             if not font['standard_font']:
@@ -470,6 +481,9 @@ class FPDFRB(fpdf.FPDF):
             if underline:
                 style += 'U'
             fpdf.FPDF.set_font(self, family, style, size)
+            return True
+        else:
+            return False
 
 
 class Report:
