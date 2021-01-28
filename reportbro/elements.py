@@ -1181,7 +1181,7 @@ class TableBandElement(object):
                 # try to render it on top of next page
                 self.prepare_container = True
                 if offset_y == 0:
-                    field = 'always_print_on_same_page' if self.band_type == BandType.content else 'size'
+                    field = 'alwaysPrintOnSamePage' if self.band_type == BandType.content else 'size'
                     raise ReportBroError(
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
@@ -1393,7 +1393,7 @@ class SectionBandElement(object):
                 # try to render it on top of next page
                 self.prepare_container = True
                 if offset_y == 0:
-                    field = 'size' if self.band_type == BandType.header else 'always_print_on_same_page'
+                    field = 'size' if self.band_type == BandType.header else 'alwaysPrintOnSamePage'
                     raise ReportBroError(
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
