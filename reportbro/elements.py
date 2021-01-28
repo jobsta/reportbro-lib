@@ -1347,7 +1347,8 @@ class SectionBandElement(object):
             container_id=str(data.get('linkedContainerId')), containers=containers, report=report)
         self.container.width = self.width
         self.container.height = self.height
-        self.container.allow_page_break = False
+        if band_type != BandType.content:
+            self.container.allow_page_break = False
         self.rendering_complete = False
         self.prepare_container = True
         self.rendered_band_height = 0
@@ -1500,6 +1501,9 @@ class SectionElement(DocElement):
             if not self.content.rendering_complete:
                 return render_element, False
             self.row_index += 1
+            # in case of a manual page break inside content band we stop rendering and start on new page
+            if self.content.container.explicit_page_break:
+                return render_element, False
 
         if self.footer:
             self.footer.create_render_elements(
