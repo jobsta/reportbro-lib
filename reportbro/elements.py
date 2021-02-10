@@ -1373,6 +1373,11 @@ class SectionBandElement(object):
             self.rendering_complete = self.container.create_render_elements(
                 container_top + offset_y, available_height, ctx=ctx, pdf_doc=pdf_doc)
 
+            if self.container.explicit_page_break and self.always_print_on_same_page:
+                # a manual page break is not allowed if the whole content should be printed on the same page
+                raise ReportBroError(
+                    Error('errorMsgSectionBandPageBreakNotAllowed', object_id=self.id, field='alwaysPrintOnSamePage'))
+
         if self.rendering_complete:
             remaining_min_height = self.height - self.rendered_band_height
             if not self.shrink_to_content_height and self.container.used_band_height < remaining_min_height:
@@ -1399,8 +1404,15 @@ class SectionBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-                self.container.first_element_offset_y = available_height
-                self.container.used_band_height = available_height
+                if self.container.explicit_page_break:
+                    # in case of manual page break the used band height
+                    # is the position of the page break element
+                    self.container.used_band_height += self.container.first_element_offset_y
+                else:
+                    # in case the available height was not sufficient the used band height
+                    # is the total available height
+                    self.container.first_element_offset_y = available_height
+                    self.container.used_band_height += available_height
 
     def get_used_band_height(self):
         return self.container.used_band_height
@@ -1501,8 +1513,12 @@ class SectionElement(DocElement):
             if not self.content.rendering_complete:
                 return render_element, False
             self.row_index += 1
+
+            page_break = self.content.container.explicit_page_break
+            self.content.container.reset()
+
             # in case of a manual page break inside content band we stop rendering and start on new page
-            if self.content.container.explicit_page_break:
+            if page_break:
                 return render_element, False
 
         if self.footer:

@@ -19,7 +19,6 @@ class Container(object):
         self.render_elements = None  # type: List[DocElementBase]
         self.render_elements_created = False
         self.explicit_page_break = True
-        self.page_y = 0
         self.first_element_offset_y = 0
         self.used_band_height = 0
 
@@ -89,7 +88,7 @@ class Container(object):
                         elem_deleted = True
                         new_page = True
                         set_explicit_page_break = True
-                        self.page_y = elem.y
+                        self.first_element_offset_y = elem.y
                     else:
                         self.sorted_elements = []
                         return True
@@ -99,15 +98,12 @@ class Container(object):
                         # element is on same page as predecessor element(s) so offset is relative to predecessors
                         offset_y = elem.get_offset_y()
                     else:
-                        if self.allow_page_break:
-                            if elem.first_render_element and self.explicit_page_break:
-                                offset_y = elem.y - self.page_y
-                            else:
-                                offset_y = 0
-                        else:
+                        if not self.allow_page_break or (elem.first_render_element and self.explicit_page_break):
                             offset_y = elem.y - self.first_element_offset_y
                             if offset_y < 0:
                                 offset_y = 0
+                        else:
+                            offset_y = 0
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
@@ -193,6 +189,19 @@ class Container(object):
     def is_finished(self):
         return len(self.render_elements) == 0
 
+    def reset(self):
+        """Reset container when used multiple times.
+
+        Must be called when the same container is used for rendering, e.g. for
+        different rows in a section content band or a repeated header.
+        """
+        self.explicit_page_break = True
+        self.first_element_offset_y = 0
+        self.used_band_height = 0
+        for elem in self.doc_elements:
+            elem.first_render_element = True
+            elem.rendering_complete = False
+
     def cleanup(self):
         for elem in self.doc_elements:
             elem.cleanup()
@@ -211,7 +220,7 @@ class ReportBand(Container):
         Container.__init__(self, container_id, containers, report)
         self.band = band
         self.width = report.document_properties.page_width -\
-                report.document_properties.margin_left - report.document_properties.margin_right
+            report.document_properties.margin_left - report.document_properties.margin_right
         if band == BandType.content:
             self.height = report.document_properties.content_height
         elif band == BandType.header:
