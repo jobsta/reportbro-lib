@@ -1,5 +1,4 @@
 from __future__ import division
-from .context import Context
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError
@@ -33,10 +32,12 @@ class ImageRenderElement(DocElementBase):
         if self.image_key:
             image = self.report.get_image(self.image_key)
             if image and image.image_fp:
-                halign = {HorizontalAlignment.left: 'L', HorizontalAlignment.center: 'C',
-                        HorizontalAlignment.right: 'R'}.get(self.horizontal_alignment)
-                valign = {VerticalAlignment.top: 'T', VerticalAlignment.middle: 'C',
-                        VerticalAlignment.bottom: 'B'}.get(self.vertical_alignment)
+                halign = {
+                    HorizontalAlignment.left: 'L', HorizontalAlignment.center: 'C',
+                    HorizontalAlignment.right: 'R'}.get(self.horizontal_alignment)
+                valign = {
+                    VerticalAlignment.top: 'T', VerticalAlignment.middle: 'C',
+                    VerticalAlignment.bottom: 'B'}.get(self.vertical_alignment)
                 try:
                     image_info = pdf_doc.image(
                         self.image_key, x, y, self.width, self.height, type=image.image_type,
