@@ -1,5 +1,14 @@
 # Changelog
 
+## Upcoming Release
+
+### Changes
+* allow manual page break inside section content
+
+### Bug Fixes
+* fix returned exception for 'always on same page' setting so error can
+be displayed in ReportBro Designer
+
 ## [1.5.2] - 2020-10-06
 
 ### Changes
