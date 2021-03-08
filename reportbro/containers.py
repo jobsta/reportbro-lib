@@ -18,7 +18,7 @@ class Container(object):
         self.sorted_elements = None  # type: List[DocElementBase]
         self.render_elements = None  # type: List[DocElementBase]
         self.render_elements_created = False
-        self.explicit_page_break = True
+        self.explicit_page_break = False
         self.first_element_offset_y = 0
         self.used_band_height = 0
 
@@ -132,7 +132,7 @@ class Container(object):
 
         # in case of manual page break the element on the next page is positioned relative
         # to page break position
-        self.explicit_page_break = set_explicit_page_break if self.allow_page_break else True
+        self.explicit_page_break = set_explicit_page_break if self.allow_page_break else False
 
         if len(self.sorted_elements) > 0:
             if self.allow_page_break:
@@ -195,7 +195,7 @@ class Container(object):
         Must be called when the same container is used for rendering, e.g. for
         different rows in a section content band or a repeated header.
         """
-        self.explicit_page_break = True
+        self.explicit_page_break = False
         self.first_element_offset_y = 0
         self.used_band_height = 0
         for elem in self.doc_elements:
