@@ -18,7 +18,10 @@ class Container(object):
         self.sorted_elements = None  # type: List[DocElementBase]
         self.render_elements = None  # type: List[DocElementBase]
         self.render_elements_created = False
-        self.explicit_page_break = False
+        self.manual_page_break = False
+        # on the first page or in case there was a manual page break the first element is positioned
+        # relative to its predecessor, otherwise the first element is positioned at the top
+        self.use_relative_offset = True
         self.first_element_offset_y = 0
         self.used_band_height = 0
 
@@ -74,7 +77,7 @@ class Container(object):
         completed_elements = dict()
 
         self.render_elements_created = False
-        set_explicit_page_break = False
+        set_manual_page_break = False
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
             if elem.has_uncompleted_predecessor(completed_elements):
@@ -87,7 +90,7 @@ class Container(object):
                         del self.sorted_elements[i]
                         elem_deleted = True
                         new_page = True
-                        set_explicit_page_break = True
+                        set_manual_page_break = True
                         self.first_element_offset_y = elem.y
                     else:
                         self.sorted_elements = []
@@ -98,7 +101,7 @@ class Container(object):
                         # element is on same page as predecessor element(s) so offset is relative to predecessors
                         offset_y = elem.get_offset_y()
                     else:
-                        if not self.allow_page_break or (elem.first_render_element and self.explicit_page_break):
+                        if not self.allow_page_break or (elem.first_render_element and self.use_relative_offset):
                             offset_y = elem.y - self.first_element_offset_y
                             if offset_y < 0:
                                 offset_y = 0
@@ -130,9 +133,11 @@ class Container(object):
                 if not elem_deleted:
                     i += 1
 
-        # in case of manual page break the element on the next page is positioned relative
-        # to page break position
-        self.explicit_page_break = set_explicit_page_break if self.allow_page_break else False
+        if self.allow_page_break:
+            self.manual_page_break = set_manual_page_break
+            # in case of manual page break the element on the next page is positioned relative
+            # to the page break position
+            self.use_relative_offset = self.manual_page_break
 
         if len(self.sorted_elements) > 0:
             if self.allow_page_break:
@@ -193,9 +198,10 @@ class Container(object):
         """Reset container when used multiple times.
 
         Must be called when the same container is used for rendering, e.g. for
-        different rows in a section content band or a repeated header.
+        different rows in a section content band or a repeated header/footer.
         """
-        self.explicit_page_break = False
+        self.manual_page_break = False
+        self.use_relative_offset = True
         self.first_element_offset_y = 0
         self.used_band_height = 0
         for elem in self.doc_elements:
