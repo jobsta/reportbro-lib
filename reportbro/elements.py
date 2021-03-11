@@ -1517,8 +1517,9 @@ class SectionElement(DocElement):
             page_break = self.content.container.explicit_page_break
             self.content.container.reset()
 
-            # in case of a manual page break inside content band we stop rendering and start on new page
-            if page_break:
+            # in case of a manual page break inside content band (unless already in last row)
+            # we stop rendering and start on new page
+            if page_break and self.row_index < self.row_count:
                 return render_element, False
 
         if self.footer:
