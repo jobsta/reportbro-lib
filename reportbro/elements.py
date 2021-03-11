@@ -1373,7 +1373,7 @@ class SectionBandElement(object):
             self.rendering_complete = self.container.create_render_elements(
                 container_top + offset_y, available_height, ctx=ctx, pdf_doc=pdf_doc)
 
-            if self.container.explicit_page_break and self.always_print_on_same_page:
+            if self.container.manual_page_break and self.always_print_on_same_page:
                 # a manual page break is not allowed if the whole content should be printed on the same page
                 raise ReportBroError(
                     Error('errorMsgSectionBandPageBreakNotAllowed', object_id=self.id, field='alwaysPrintOnSamePage'))
@@ -1404,7 +1404,7 @@ class SectionBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-                if self.container.explicit_page_break:
+                if self.container.manual_page_break:
                     # in case of manual page break the used band height
                     # is the position of the page break element
                     self.container.used_band_height += self.container.first_element_offset_y
@@ -1412,7 +1412,7 @@ class SectionBandElement(object):
                     # in case the available height was not sufficient the used band height
                     # is the total available height
                     self.container.first_element_offset_y = available_height
-                    self.container.used_band_height += available_height
+                    self.container.used_band_height = available_height
 
     def get_used_band_height(self):
         return self.container.used_band_height
@@ -1514,7 +1514,7 @@ class SectionElement(DocElement):
                 return render_element, False
             self.row_index += 1
 
-            page_break = self.content.container.explicit_page_break
+            page_break = self.content.container.manual_page_break
             self.content.container.reset()
 
             # in case of a manual page break inside content band (unless already in last row)
