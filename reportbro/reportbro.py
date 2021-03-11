@@ -116,8 +116,8 @@ class DocumentPDFRenderer:
                 self.header_band.prepare(self.context, self.pdf_doc)
                 self.header_band.create_render_elements(
                     0, self.document_properties.header_size, self.context, self.pdf_doc)
-                self.header_band.render_pdf(self.document_properties.margin_left,
-                    self.document_properties.margin_top, self.pdf_doc)
+                self.header_band.render_pdf(
+                    self.document_properties.margin_left, self.document_properties.margin_top, self.pdf_doc)
             if self.document_properties.footer_display == BandDisplay.always or\
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_number != 1):
                 self.footer_band.prepare(self.context, self.pdf_doc)
