@@ -1379,7 +1379,7 @@ class SectionBandElement(object):
                     Error('errorMsgSectionBandPageBreakNotAllowed', object_id=self.id, field='alwaysPrintOnSamePage'))
 
         if self.rendering_complete:
-            remaining_min_height = self.height - self.rendered_band_height
+            remaining_min_height = self.height - self.rendered_band_height - self.container.skipped_height
             if not self.shrink_to_content_height and self.container.used_band_height < remaining_min_height:
                 # rendering of band complete, make sure band is at least as large
                 # as minimum height (even if it spans over more than 1 page)
@@ -1407,7 +1407,7 @@ class SectionBandElement(object):
                 if self.container.manual_page_break:
                     # in case of manual page break the used band height
                     # is the position of the page break element
-                    self.container.used_band_height += self.container.first_element_offset_y
+                    self.container.used_band_height = self.container.first_element_offset_y
                 else:
                     # in case the available height was not sufficient the used band height
                     # is the total available height

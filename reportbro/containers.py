@@ -23,6 +23,10 @@ class Container(object):
         # relative to its predecessor, otherwise the first element is positioned at the top
         self.use_relative_offset = True
         self.first_element_offset_y = 0
+        # in case not all elements could be rendered on the same page, the next element will start
+        # at the top of the next page independent of the actual distance to its predecessor. the
+        # skipped height is the difference to the predecessor which gets "lost" because of the new page
+        self.skipped_height = 0
         self.used_band_height = 0
 
     def add(self, doc_element):
@@ -110,6 +114,9 @@ class Container(object):
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
+                            # add to "lost" height of container because next element is printed at top
+                            # of next page instead of actual offset
+                            self.skipped_height += offset_y - container_height
                             new_page = True
                         if not new_page:
                             render_elem, complete = elem.get_next_render_element(
@@ -203,6 +210,7 @@ class Container(object):
         self.manual_page_break = False
         self.use_relative_offset = True
         self.first_element_offset_y = 0
+        self.skipped_height = 0
         self.used_band_height = 0
         for elem in self.doc_elements:
             elem.first_render_element = True
