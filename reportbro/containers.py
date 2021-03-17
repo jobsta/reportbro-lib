@@ -19,9 +19,6 @@ class Container(object):
         self.render_elements = None  # type: List[DocElementBase]
         self.render_elements_created = False
         self.manual_page_break = False
-        # on the first page or in case there was a manual page break the first element is positioned
-        # relative to its predecessor, otherwise the first element is positioned at the top
-        self.use_relative_offset = True
         self.first_element_offset_y = 0
         # in case not all elements could be rendered on the same page, the next element will start
         # at the top of the next page independent of the actual distance to its predecessor. the
@@ -82,6 +79,7 @@ class Container(object):
 
         self.render_elements_created = False
         set_manual_page_break = False
+        last_offset_y = 0
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
             if elem.has_uncompleted_predecessor(completed_elements):
@@ -89,6 +87,7 @@ class Container(object):
                 new_page = True
             else:
                 elem_deleted = False
+                last_offset_y = elem.y
                 if isinstance(elem, PageBreakElement):
                     if self.allow_page_break:
                         del self.sorted_elements[i]
@@ -105,7 +104,7 @@ class Container(object):
                         # element is on same page as predecessor element(s) so offset is relative to predecessors
                         offset_y = elem.get_offset_y()
                     else:
-                        if not self.allow_page_break or (elem.first_render_element and self.use_relative_offset):
+                        if elem.first_render_element:
                             offset_y = elem.y - self.first_element_offset_y
                             if offset_y < 0:
                                 offset_y = 0
@@ -142,9 +141,7 @@ class Container(object):
 
         if self.allow_page_break:
             self.manual_page_break = set_manual_page_break
-            # in case of manual page break the element on the next page is positioned relative
-            # to the page break position
-            self.use_relative_offset = self.manual_page_break
+        self.first_element_offset_y = last_offset_y
 
         if len(self.sorted_elements) > 0:
             if self.allow_page_break:
@@ -208,7 +205,6 @@ class Container(object):
         different rows in a section content band or a repeated header/footer.
         """
         self.manual_page_break = False
-        self.use_relative_offset = True
         self.first_element_offset_y = 0
         self.skipped_height = 0
         self.used_band_height = 0

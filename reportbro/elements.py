@@ -1186,7 +1186,6 @@ class TableBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-                self.container.first_element_offset_y = available_height
                 self.container.used_band_height = available_height
 
     def get_used_band_height(self):
@@ -1411,7 +1410,6 @@ class SectionBandElement(object):
                 else:
                     # in case the available height was not sufficient the used band height
                     # is the total available height
-                    self.container.first_element_offset_y = available_height
                     self.container.used_band_height = available_height
 
     def get_used_band_height(self):

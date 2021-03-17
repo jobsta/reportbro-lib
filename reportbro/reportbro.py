@@ -118,14 +118,17 @@ class DocumentPDFRenderer:
                     0, self.document_properties.header_size, self.context, self.pdf_doc)
                 self.header_band.render_pdf(
                     self.document_properties.margin_left, self.document_properties.margin_top, self.pdf_doc)
+                self.header_band.reset()
             if self.document_properties.footer_display == BandDisplay.always or\
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_number != 1):
                 self.footer_band.prepare(self.context, self.pdf_doc)
                 self.footer_band.create_render_elements(
                     0, self.document_properties.footer_size, self.context, self.pdf_doc)
                 self.footer_band.render_pdf(self.document_properties.margin_left, footer_offset_y, self.pdf_doc)
+                self.footer_band.reset()
 
-            self.content_band.render_pdf(self.document_properties.margin_left, content_offset_y, self.pdf_doc, cleanup=True)
+            self.content_band.render_pdf(
+                self.document_properties.margin_left, content_offset_y, self.pdf_doc, cleanup=True)
 
         self.header_band.cleanup()
         self.footer_band.cleanup()
