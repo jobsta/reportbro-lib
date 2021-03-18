@@ -78,8 +78,7 @@ class Container(object):
         completed_elements = dict()
 
         self.render_elements_created = False
-        set_manual_page_break = False
-        last_offset_y = 0
+        next_offset_y = None
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
             if elem.has_uncompleted_predecessor(completed_elements):
@@ -87,14 +86,13 @@ class Container(object):
                 new_page = True
             else:
                 elem_deleted = False
-                last_offset_y = elem.y
                 if isinstance(elem, PageBreakElement):
                     if self.allow_page_break:
                         del self.sorted_elements[i]
                         elem_deleted = True
                         new_page = True
-                        set_manual_page_break = True
-                        self.first_element_offset_y = elem.y
+                        self.manual_page_break = True
+                        next_offset_y = elem.y
                     else:
                         self.sorted_elements = []
                         return True
@@ -132,6 +130,12 @@ class Container(object):
                         processed_elements.append(elem)
                         elem.finish_empty_element(offset_y)
                         complete = True
+
+                    if not complete and next_offset_y is None:
+                        # in case we continue rendering on the next page the first element which is not complete
+                        # will define the offset-y for the next page
+                        next_offset_y = elem.y
+
                     if complete:
                         completed_elements[elem.id] = True
                         del self.sorted_elements[i]
@@ -139,9 +143,7 @@ class Container(object):
                 if not elem_deleted:
                     i += 1
 
-        if self.allow_page_break:
-            self.manual_page_break = set_manual_page_break
-        self.first_element_offset_y = last_offset_y
+        self.first_element_offset_y = next_offset_y if next_offset_y else 0
 
         if len(self.sorted_elements) > 0:
             if self.allow_page_break:
