@@ -78,6 +78,7 @@ class Container(object):
         completed_elements = dict()
 
         self.render_elements_created = False
+        self.manual_page_break = False
         next_offset_y = None
         while not new_page and i < len(self.sorted_elements):
             elem = self.sorted_elements[i]
