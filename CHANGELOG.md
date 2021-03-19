@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming Release
+## [1.6.0] - 2021-03-19
 
 ### Changes
 * allow manual page break inside section content
