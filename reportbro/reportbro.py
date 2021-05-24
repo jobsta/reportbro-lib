@@ -44,14 +44,14 @@ regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
 
 class DocumentPDFRenderer:
     def __init__(self, header_band, content_band, footer_band, report, context,
-                 additional_fonts, filename, add_watermark, page_limit, encode_error_handling):
+                 additional_fonts, filename, add_watermark, page_limit, encode_error_handling, core_fonts_encoding):
         self.header_band = header_band
         self.content_band = content_band
         self.footer_band = footer_band
         self.document_properties = report.document_properties
         self.pdf_doc = FPDFRB(
             report.document_properties, additional_fonts=additional_fonts,
-            encode_error_handling=encode_error_handling)
+            encode_error_handling=encode_error_handling, core_fonts_encoding=core_fonts_encoding)
         self.pdf_doc.set_margins(0, 0)
         self.pdf_doc.c_margin = 0  # interior cell margin
         self.context = context
@@ -390,7 +390,7 @@ class ImageData:
 
 
 class FPDFRB(fpdf.FPDF):
-    def __init__(self, document_properties, additional_fonts, encode_error_handling):
+    def __init__(self, document_properties, additional_fonts, encode_error_handling, core_fonts_encoding):
         if document_properties.orientation == Orientation.portrait:
             orientation = 'P'
             dimension = (document_properties.page_width, document_properties.page_height)
@@ -400,7 +400,7 @@ class FPDFRB(fpdf.FPDF):
         fpdf.FPDF.__init__(self, orientation=orientation, unit='pt', format=dimension)
         self.x = 0
         self.y = 0
-        self.set_doc_option('core_fonts_encoding', 'windows-1252')
+        self.set_doc_option('core_fonts_encoding', core_fonts_encoding)
         self.set_doc_option('encode_error_handling', encode_error_handling)
         self.loaded_images = dict()
         self.available_fonts = dict(
@@ -491,7 +491,8 @@ class FPDFRB(fpdf.FPDF):
 
 class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,
-                 page_limit=10000, request_headers=None, encode_error_handling='strict'):
+                 page_limit=10000, request_headers=None, encode_error_handling='strict',
+                 core_fonts_encoding='windows-1252'):
         """Create Report instance which can then be used to generate pdf and xlsx reports.
 
         :param report_definition: The report object containg report elements, parameters,
@@ -515,6 +516,9 @@ class Report:
         - 'strict': raise a UnicodeDecodeError exception
         - 'ignore': just leave the character out of the result
         - 'replace': use U+FFFD replacement character
+        :param core_fonts_encoding: defines the encoding when using the core fonts.
+        Default is 'windows-1252' which is usually the best choice for English and many European
+        languages including Spanish, French, and German.
         """
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
@@ -537,6 +541,7 @@ class Report:
         self.additional_fonts = additional_fonts
         self.page_limit = page_limit
         self.encode_error_handling = encode_error_handling
+        self.core_fonts_encoding = core_fonts_encoding
         # request headers used when fetching images by url (some sites check for existance
         # of user-agent header and do not return image otherwise)
         self.request_headers = {'User-Agent': 'Mozilla/5.0'}
@@ -627,7 +632,7 @@ class Report:
             header_band=self.header, content_band=self.content, footer_band=self.footer,
             report=self, context=self.context, additional_fonts=self.additional_fonts,
             filename=filename, add_watermark=add_watermark, page_limit=self.page_limit,
-            encode_error_handling=self.encode_error_handling)
+            encode_error_handling=self.encode_error_handling, core_fonts_encoding=self.core_fonts_encoding)
         return renderer.render()
 
     def generate_xlsx(self, filename=''):
