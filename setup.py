@@ -33,6 +33,9 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 
     keywords='pdf excel report generate create web template layout',
@@ -44,7 +47,7 @@ setup(
         'reportbro-fpdf>=1.7.10',
         'Pillow>=4.0',
         'simpleeval>=0.9.10',
-        'typing',
+        'typing;python_version<"3.5"',
         'xlsxwriter'
     ],
 
