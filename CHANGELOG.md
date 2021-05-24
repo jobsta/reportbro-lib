@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming Release
+
+### Changes
+* add option to set encoding for core fonts
+
 ## [1.6.0] - 2021-03-19
 
 ### Changes
