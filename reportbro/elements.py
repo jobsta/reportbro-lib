@@ -878,40 +878,52 @@ class TableElement(DocElement):
                 self.print_header = False
 
         first_render_row_index = self.row_index
+        first_content_row_index = self.content_row_index
+        first_row_on_page = True
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
-            for content_row in self.content_rows[self.content_row_index:]:
-                content_row.prepare(ctx=ctx)
-                if content_row.is_printed(ctx=ctx):
-                    # only perform page break before content if there is at least
-                    # one rendered row
-                    if content_row.page_break and content_row.before_group and\
-                            self.row_index != first_render_row_index:
-                        ctx.pop_context()
-                        return render_element, False
+            self.content_row_index = 0
+            for content_row in self.content_rows:
+                # in case we are on the first row of the page we have to check if the content row
+                # is visible (and not already displayed on previous page) or if it is a group content
+                # row which is repeated on every page
+                if not first_row_on_page or self.content_row_index >= first_content_row_index or\
+                        content_row.repeat_group_header:
+                    content_row.prepare(ctx=ctx)
+                    if content_row.repeat_group_header and first_row_on_page:
+                        # group content row is repeated on every page
+                        content_row.group_changed = True
 
-                    content_row.create_render_elements(
-                        offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+                    if content_row.is_printed(ctx=ctx):
+                        # only perform page break before content if there is at least
+                        # one rendered row
+                        if content_row.page_break and content_row.before_group and\
+                                self.row_index != first_render_row_index:
+                            ctx.pop_context()
+                            return render_element, False
 
-                    render_element.add_band(content_row, row_index=self.row_index)
-                    if not content_row.rendering_complete:
-                        ctx.pop_context()
-                        return render_element, False
+                        content_row.create_render_elements(
+                            offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
 
-                    # only perform page break after content if this is not the last row
-                    if content_row.page_break and not content_row.before_group and\
-                            self.row_index < (self.row_count - 1):
-                        self.content_row_index += 1
-                        ctx.pop_context()
-                        return render_element, False
-                else:
-                    content_row.rendering_complete = True
+                        render_element.add_band(content_row, row_index=self.row_index)
+                        if not content_row.rendering_complete:
+                            ctx.pop_context()
+                            return render_element, False
+
+                        # only perform page break after content if this is not the last row
+                        if content_row.page_break and not content_row.before_group and\
+                                self.row_index < (self.row_count - 1):
+                            self.content_row_index += 1
+                            ctx.pop_context()
+                            return render_element, False
+                    else:
+                        content_row.rendering_complete = True
                 self.content_row_index += 1
             ctx.pop_context()
 
             self.row_index += 1
-            self.content_row_index = 0
+            first_row_on_page = False
             self.set_group_expr_result(ctx)
 
         if self.row_index >= self.row_count and self.print_footer:
@@ -1006,11 +1018,16 @@ class TableBandElement(object):
         self.print_if = data.get('printIf', '')
         self.before_group = before_group
         self.page_break = False
+        self.repeat_group_header = None
         if band_type == BandType.content:
             self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
             self.always_print_on_same_page = bool(data.get('alwaysPrintOnSamePage'))
             if self.group_expression:
                 self.page_break = bool(data.get('pageBreak'))
+                self.repeat_group_header = bool(data.get('repeatGroupHeader'))
+                if self.repeat_group_header and not before_group:
+                    report.errors.append(Error(
+                        'errorMsgRepeatGroupHeaderAfterContent', object_id=self.id, field='repeatGroupHeader'))
         else:
             self.alternate_background_color = None
             self.always_print_on_same_page = True
