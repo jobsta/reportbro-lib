@@ -47,6 +47,7 @@ setup(
         'reportbro-fpdf>=1.7.10',
         'Pillow>=4.0',
         'simpleeval>=0.9.10',
+        'qrcode>=6.1',
         'typing;python_version<"3.5"',
         'xlsxwriter'
     ],

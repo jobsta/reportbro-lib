@@ -3,11 +3,11 @@ from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
 from io import BytesIO
-from typing import List
 import copy
 import datetime
 import decimal
 import PIL
+import qrcode
 import tempfile
 
 from .barcode128 import code128_image
@@ -119,8 +119,16 @@ class BarCodeElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = data.get('content', '')
         self.format = data.get('format', '').lower()
-        assert self.format == 'code128'
+        assert self.format in ('code128', 'qrcode')
         self.display_value = bool(data.get('displayValue'))
+        error_correction_level = data.get('errorCorrectionLevel')
+        self.error_correction_level = qrcode.ERROR_CORRECT_M
+        if error_correction_level == 'L':
+            self.error_correction_level = qrcode.ERROR_CORRECT_L
+        elif error_correction_level == 'H':
+            self.error_correction_level = qrcode.ERROR_CORRECT_H
+        elif error_correction_level == 'Q':
+            self.error_correction_level = qrcode.ERROR_CORRECT_Q
         self.print_if = data.get('printIf', '')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
@@ -128,7 +136,7 @@ class BarCodeElement(DocElement):
         self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.image_key = None
-        self.image_height = self.height - 22 if self.display_value else self.height
+        self.image_height = self.height - 22 if (self.display_value and self.format == 'code128') else self.height
         self.prepared_content = None
 
     def is_printed(self, ctx):
@@ -141,7 +149,10 @@ class BarCodeElement(DocElement):
         self.prepared_content = ctx.fill_parameters(self.content, self.id, field='content')
         if self.prepared_content:
             try:
-                img = code128_image(self.prepared_content, height=self.image_height, thickness=2, quiet_zone=False)
+                if self.format == 'qrcode':
+                    img = qrcode.make(self.prepared_content, border=0, error_correction=self.error_correction_level)
+                elif self.format == 'code128':
+                    img = code128_image(self.prepared_content, height=self.image_height, thickness=2, quiet_zone=False)
             except:
                 raise ReportBroError(
                     Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
@@ -149,7 +160,12 @@ class BarCodeElement(DocElement):
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as f:
                     img.save(f.name)
                     self.image_key = f.name
-                    self.width = img.width
+                    if self.format == 'qrcode':
+                        # QR Code is always quadratic and only height can be set -> use same value for width
+                        self.width = self.height
+                    else:
+                        # for Code128 the width is defined by the image width of the bar code
+                        self.width = img.width
 
     def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
         _, rv = DocElement.get_next_render_element(
