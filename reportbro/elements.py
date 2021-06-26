@@ -120,7 +120,7 @@ class BarCodeElement(DocElement):
         self.content = data.get('content', '')
         self.format = data.get('format', '').lower()
         assert self.format in ('code128', 'qrcode')
-        self.display_value = bool(data.get('displayValue'))
+        self.display_value = bool(data.get('displayValue')) if self.format == 'code128' else False
         error_correction_level = data.get('errorCorrectionLevel')
         self.error_correction_level = qrcode.ERROR_CORRECT_M
         if error_correction_level == 'L':
