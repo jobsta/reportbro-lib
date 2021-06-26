@@ -2,6 +2,11 @@
 
 ## Upcoming Release
 
+### Features
+* rendering of Rich Text (PLUS version)
+* QR Code
+* support option to repeat table group on each page
+
 ### Changes
 * add option to set encoding for core fonts
 
