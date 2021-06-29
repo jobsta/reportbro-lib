@@ -212,6 +212,11 @@ class TextElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
         self.content = data.get('content', '')
+        self.rich_text = bool(data.get('richText'))
+        self.rich_text_content = data.get('richTextContent', {})
+        if self.rich_text and (not isinstance(self.rich_text_content, dict) or
+                               not isinstance(self.rich_text_content.get('ops'), list)):
+            raise RuntimeError('Invalid richTextContent for text element {id}'.format(id=self.id))
         self.eval = bool(data.get('eval'))
         if data.get('styleId'):
             style = report.styles.get(get_int_value(data, 'styleId'))
@@ -255,7 +260,6 @@ class TextElement(DocElement):
         self.spreadsheet_formats = dict()  # caching of formats for rendering spreadsheet
         self.text_height = 0
         self.line_index = -1
-        self.line_height = 0
         self.lines_count = 0
         self.text_lines = None
         self.used_style = None
@@ -275,38 +279,39 @@ class TextElement(DocElement):
         return DocElementBase.is_printed(self, ctx)
 
     def prepare(self, ctx, pdf_doc, only_verify):
-        if self.eval:
-            content = ctx.evaluate_expression(self.content, self.id, field='content')
-            if self.pattern:
-                if isinstance(content, (int, float, decimal.Decimal)):
-                    try:
-                        content = format_decimal(content, self.pattern, locale=ctx.pattern_locale)
-                        if self.pattern.find('$') != -1:
-                            content = content.replace('$', ctx.pattern_currency_symbol)
-                    except ValueError:
-                        raise ReportBroError(
-                            Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
-                elif isinstance(content, datetime.date):
-                    try:
-                        content = format_datetime(content, self.pattern, locale=ctx.pattern_locale)
-                    except ValueError:
-                        raise ReportBroError(
-                            Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
-            content = to_string(content)
+        if not self.rich_text:
+            if self.eval:
+                content = ctx.evaluate_expression(self.content, self.id, field='content')
+                if self.pattern:
+                    if isinstance(content, (int, float, decimal.Decimal)):
+                        try:
+                            content = format_decimal(content, self.pattern, locale=ctx.pattern_locale)
+                            if self.pattern.find('$') != -1:
+                                content = content.replace('$', ctx.pattern_currency_symbol)
+                        except ValueError:
+                            raise ReportBroError(
+                                Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
+                    elif isinstance(content, datetime.date):
+                        try:
+                            content = format_datetime(content, self.pattern, locale=ctx.pattern_locale)
+                        except ValueError:
+                            raise ReportBroError(
+                                Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
+                content = to_string(content)
+            else:
+                content = self.fill_parameters(ctx)
+
+            if self.link:
+                self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
+                if not (self.prepared_link.startswith('http://') or self.prepared_link.startswith('https://')):
+                    raise ReportBroError(
+                        Error('errorMsgInvalidLink', object_id=self.id, field='link'))
         else:
-            content = self.fill_parameters(ctx)
+            content = None
 
-        if self.link:
-            self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
-            if not (self.prepared_link.startswith('http://') or self.prepared_link.startswith('https://')):
-                raise ReportBroError(
-                    Error('errorMsgInvalidLink', object_id=self.id, field='link'))
-
-        use_cs_style = False
         if self.cs_condition:
             if ctx.evaluate_expression(self.cs_condition, self.id, field='cs_condition'):
                 self.used_style = self.conditional_style
-                use_cs_style = True
             else:
                 self.used_style = self.style
         else:
@@ -318,31 +323,8 @@ class TextElement(DocElement):
 
         self.text_lines = []
         if pdf_doc:
-            if not pdf_doc.set_font(
-                    self.used_style.font, self.used_style.font_style, self.used_style.font_size,
-                    underline=self.used_style.underline):
-                error_field = 'cs_font' if use_cs_style else 'font'
-                raise ReportBroError(
-                    Error('errorMsgFontNotAvailable', object_id=self.id, field=error_field))
-
-            if content:
-                try:
-                    lines = pdf_doc.multi_cell(available_width, 0, content, align=self.used_style.text_align, split_only=True)
-                except UnicodeEncodeError:
-                    raise ReportBroError(
-                        Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
-            else:
-                lines = []
-            self.line_height = self.used_style.font_size * self.used_style.line_spacing
-            self.lines_count = len(lines)
-            if self.lines_count > 0:
-                self.text_height = (len(lines) - 1) * self.line_height + self.used_style.font_size
-            else:
-                self.text_height = 0
+            self.split_text_lines(content, available_width=available_width, ctx=ctx, pdf_doc=pdf_doc)
             self.line_index = 0
-            for line in lines:
-                self.text_lines.append(TextLine(
-                    line, width=available_width, style=self.used_style, link=self.prepared_link))
 
             if isinstance(self, TableTextElement):
                 self.total_height = max(
@@ -403,7 +385,7 @@ class TextElement(DocElement):
             first_line = True
             while self.line_index < self.lines_count:
                 last_line = (self.line_index >= self.lines_count - 1)
-                line_height = self.used_style.font_size if first_line else self.line_height
+                line_height = self.text_lines[self.line_index].height
                 tmp_height = line_height
                 if self.line_index == 0:
                     tmp_height += self.used_style.padding_top
@@ -459,8 +441,7 @@ class TextElement(DocElement):
         text_block_elem = TextBlockElement(
             self.report, x=self.x, y=self.y, render_y=offset_y,
             width=self.width, height=block_height, text_offset_y=text_offset_y,
-            lines=lines, line_height=self.line_height,
-            render_element_type=render_element_type, style=self.used_style)
+            lines=lines, render_element_type=render_element_type, style=self.used_style)
         self.first_render_element = False
         self.render_bottom = text_block_elem.render_bottom
         self.rendering_complete = rendering_complete
@@ -521,10 +502,44 @@ class TextElement(DocElement):
             row += 1
         return row + 1, col + (self.spreadsheet_colspan if self.spreadsheet_colspan else 1)
 
+    def set_font_by_style(self, style, pdf_doc):
+        if not pdf_doc.set_font(
+                style.font, style.font_style, style.font_size, underline=style.underline):
+            error_field = style.key_prefix + 'font'
+            raise ReportBroError(
+                Error('errorMsgFontNotAvailable', object_id=self.id, field=error_field))
+
+    def split_text_lines(self, content, available_width, ctx, pdf_doc):
+        if content is not None:
+            self.set_font_by_style(self.used_style, pdf_doc)
+            try:
+                lines = pdf_doc.split_text(first_w=available_width, w=available_width, txt=content)
+            except UnicodeEncodeError:
+                raise ReportBroError(
+                    Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
+            for line in lines:
+                text_line = TextLine(width=available_width, style=self.used_style, link=self.prepared_link)
+                text, text_width = line
+                text_line.add_text(text, text_width, self.used_style)
+                self.text_lines.append(text_line)
+        else:
+            if hasattr(self.__class__, 'split_rich_text_lines'):
+                self.split_rich_text_lines(available_width, ctx, pdf_doc)
+            else:
+                raise ReportBroError(Error('errorMsgPlusVersionRequired', object_id=self.id, field='richText'))
+
+        self.text_height = 0
+        self.lines_count = len(self.text_lines)
+        if self.lines_count > 0:
+            self.text_lines[-1].last_line = True
+            for text_line in self.text_lines:
+                text_line.setup()
+                self.text_height += text_line.height
+
 
 class TextBlockElement(DocElementBase):
     def __init__(self, report, x, y, render_y, width, height, text_offset_y,
-                lines, line_height, render_element_type, style):
+                 lines, render_element_type, style):
         DocElementBase.__init__(self, report, dict(y=y))
         self.x = x
         self.render_y = render_y
@@ -533,7 +548,6 @@ class TextBlockElement(DocElementBase):
         self.height = height
         self.text_offset_y = text_offset_y
         self.lines = lines
-        self.line_height = line_height
         self.render_element_type = render_element_type
         self.style = style
 
@@ -553,96 +567,114 @@ class TextBlockElement(DocElementBase):
             y += self.style.padding_top
         y += self.text_offset_y
 
-        underline = self.style.underline
-        last_line_index = len(self.lines) - 1
-        # underline for justified text is drawn manually to have a single line for the
-        # whole text. each word is rendered individually,
-        # therefor we can't use the underline style of the rendered text
-        if self.style.horizontal_alignment == HorizontalAlignment.justify and last_line_index > 0:
-            underline = False
-            pdf_doc.set_draw_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
-        pdf_doc.set_font(self.style.font, self.style.font_style, self.style.font_size, underline=underline)
-        pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
-
+        self.lines[-1].last_line = True
         for i, line in enumerate(self.lines):
-            last_line = (i == last_line_index)
-            line.render_pdf(self.x + container_offset_x + self.style.padding_left, y,
-                            last_line=last_line, pdf_doc=pdf_doc)
-            y += self.line_height
+            line.render_pdf(self.x + container_offset_x + self.style.padding_left, y, pdf_doc=pdf_doc)
+            y += line.height
 
 
 class TextLine(object):
+    def __init__(self, width, style, link=None):
+        self.available_width = width
+        self.width = 0
+        self.height = 0
+        self.style = style
+        self.link = link
+        self.text = None
+        self.last_line = False
+        self.baseline_offset_y = 0
+
+    def add_text(self, text, text_width, style, link=None):
+        self.text = TextLinePart(text, text_width, style, link)
+
+    def setup(self):
+        self.width = self.text.width
+        max_font_size = self.style.font_size
+        self.baseline_offset_y = max_font_size * 0.8
+        self.height = max_font_size if self.last_line else (max_font_size * self.style.line_spacing)
+
+    def render_pdf(self, x, y, pdf_doc):
+        offset_x = 0
+        # last line of justified text is aligned left
+        if self.style.horizontal_alignment != HorizontalAlignment.justify or self.last_line:
+            if self.style.horizontal_alignment == HorizontalAlignment.center:
+                offset_x = ((self.available_width - self.width) / 2)
+            elif self.style.horizontal_alignment == HorizontalAlignment.right:
+                offset_x = self.available_width - self.width
+            render_x = x + offset_x
+            render_y = y + self.baseline_offset_y
+
+            pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
+                             size=self.style.font_size, underline=self.style.underline)
+            pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+            pdf_doc.text(render_x, render_y, self.text.text)
+            if self.style.strikethrough:
+                # use underline thickness
+                strikethrough_thickness = pdf_doc.current_font['ut']
+                render_line_y = render_y - self.style.font_size * 0.3
+                strikethrough_width = strikethrough_thickness / 1000.0 * self.style.font_size
+                pdf_doc.set_line_width(strikethrough_width)
+                pdf_doc.set_draw_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+                pdf_doc.line(render_x, render_line_y, render_x + self.text.width, render_line_y)
+            if self.text.link:
+                pdf_doc.link(render_x, y, self.text.width, self.style.font_size, self.text.link)
+            render_x += self.text.width
+        else:
+            # justify text -> split text into words and use equal space between words
+            words = []
+            total_word_width = 0
+            font_size = self.style.font_size
+
+            pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
+                             size=font_size, underline=self.style.underline)
+            pwords = self.text.text.split()
+            for pword in pwords:
+                tmp_width = pdf_doc.get_string_width(pword)
+                total_word_width += tmp_width
+                words.append((pword, tmp_width))
+
+            word_count = len(words)
+            spaces_count = word_count - 1
+            word_spacing = ((self.available_width - total_word_width) / spaces_count) if spaces_count > 0 else 0
+            render_y = y + self.baseline_offset_y
+
+            # draw words with equal space between words
+            pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+            word_x = x
+            for text, word_width in words:
+                pdf_doc.text(word_x, render_y, text)
+                word_x += word_width + word_spacing
+
+            if self.style.strikethrough:
+                line_position = pdf_doc.current_font['up']
+                line_thickness = pdf_doc.current_font['ut']
+                # strikethrough with an offset from baseline
+                render_y = y + self.baseline_offset_y - font_size * 0.3
+                line_width = line_thickness / 1000.0 * font_size
+                pdf_doc.set_line_width(line_width)
+                pdf_doc.set_draw_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+                pdf_doc.line(x, render_y, x + self.available_width, render_y)
+
+            if self.style.underline:
+                line_position = pdf_doc.current_font['up']
+                line_thickness = pdf_doc.current_font['ut']
+                # underline needs offset for line position
+                render_y = y + self.baseline_offset_y - (line_position / 1000.0 * font_size)
+                line_width = line_thickness / 1000.0 * font_size
+                pdf_doc.set_line_width(line_width)
+                pdf_doc.set_draw_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+                pdf_doc.line(x, render_y, x + self.available_width, render_y)
+
+        if self.link:
+            pdf_doc.link(x + offset_x, y, self.width, self.style.font_size, self.link)
+
+
+class TextLinePart:
     def __init__(self, text, width, style, link):
         self.text = text
         self.width = width
         self.style = style
         self.link = link
-
-    def render_pdf(self, x, y, last_line, pdf_doc):
-        render_y = y + self.style.font_size * 0.8
-        line_width = None
-        offset_x = 0
-        if self.style.horizontal_alignment == HorizontalAlignment.justify:
-            if last_line:
-                pdf_doc.set_font(
-                    self.style.font, self.style.font_style, self.style.font_size, underline=self.style.underline)
-                pdf_doc.text(x, render_y, self.text)
-            else:
-                words = self.text.split()
-                word_width = []
-                total_word_width = 0
-                for word in words:
-                    tmp_width = pdf_doc.get_string_width(word)
-                    word_width.append(tmp_width)
-                    total_word_width += tmp_width
-                count_spaces = len(words) - 1
-                word_spacing = ((self.width - total_word_width) / count_spaces) if count_spaces > 0 else 0
-                word_x = x
-                pdf_doc.set_font(self.style.font, self.style.font_style, self.style.font_size, underline=False)
-                for i, word in enumerate(words):
-                    pdf_doc.text(word_x, render_y, word)
-                    word_x += word_width[i] + word_spacing
-
-                if self.style.underline:
-                    if len(words) == 1:
-                        text_width = word_width[0]
-                    else:
-                        text_width = self.width
-                    underline_position = pdf_doc.current_font['up']
-                    underline_thickness = pdf_doc.current_font['ut']
-                    render_y += -underline_position / 1000.0 * self.style.font_size
-                    underline_width = underline_thickness / 1000.0 * self.style.font_size
-                    pdf_doc.set_line_width(underline_width)
-                    pdf_doc.line(x, render_y, x + text_width, render_y)
-
-                if len(words) > 1:
-                    line_width = self.width
-                elif len(words) > 0:
-                    line_width = word_width[0]
-        else:
-            if self.style.horizontal_alignment != HorizontalAlignment.left:
-                line_width = pdf_doc.get_string_width(self.text)
-                space = self.width - line_width
-                if self.style.horizontal_alignment == HorizontalAlignment.center:
-                    offset_x = (space / 2)
-                elif self.style.horizontal_alignment == HorizontalAlignment.right:
-                    offset_x = space
-            pdf_doc.text(x + offset_x, render_y, self.text)
-
-        if self.style.strikethrough:
-            if line_width is None:
-                line_width = pdf_doc.get_string_width(self.text)
-            # use underline thickness
-            strikethrough_thickness = pdf_doc.current_font['ut']
-            render_y = y + self.style.font_size * 0.5
-            strikethrough_width = strikethrough_thickness / 1000.0 * self.style.font_size
-            pdf_doc.set_line_width(strikethrough_width)
-            pdf_doc.line(x + offset_x, render_y, x + offset_x + line_width, render_y)
-
-        if self.link:
-            if line_width is None:
-                line_width = pdf_doc.get_string_width(self.text)
-            pdf_doc.link(x + offset_x, y, line_width, self.style.font_size, self.link)
 
 
 class TableTextElement(TextElement):
