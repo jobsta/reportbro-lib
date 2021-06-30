@@ -17,6 +17,12 @@ class Color:
             self.color_code = color
         else:
             self.transparent = True
+            self.color_code = ''
+
+    def __eq__(self, other):
+        if isinstance(other, Color):
+            return self.color_code == other.color_code
+        return False
 
     def is_black(self):
         return self.r == 0 and self.g == 0 and self.b == 0 and not self.transparent
@@ -69,6 +75,7 @@ class BorderStyle:
 class TextStyle(BorderStyle):
     def __init__(self, data, key_prefix=''):
         BorderStyle.__init__(self, data, key_prefix)
+        self.key_prefix = key_prefix
         self.id = str(get_int_value(data, 'id'))
         self.bold = bool(data.get(key_prefix + 'bold'))
         self.italic = bool(data.get(key_prefix + 'italic'))
@@ -100,6 +107,14 @@ class TextStyle(BorderStyle):
         elif self.horizontal_alignment == HorizontalAlignment.justify:
             self.text_align = 'J'
         self.add_border_padding()
+
+    def set_bold(self, bold):
+        self.bold = bold
+        self.font_style = self.get_font_style(ignore_underline=True)
+
+    def set_italic(self, italic):
+        self.italic = italic
+        self.font_style = self.get_font_style(ignore_underline=True)
 
     def get_font_style(self, ignore_underline=False):
         font_style = ''
