@@ -552,8 +552,8 @@ class TextBlockElement(DocElementBase):
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         y = container_offset_y + self.render_y
         if not self.style.background_color.transparent:
-            pdf_doc.set_fill_color(self.style.background_color.r, self.style.background_color.g,
-                    self.style.background_color.b)
+            pdf_doc.set_fill_color(
+                self.style.background_color.r, self.style.background_color.g, self.style.background_color.b)
             pdf_doc.rect(self.x + container_offset_x, y, self.width, self.height, style='F')
         if (self.style.border_left or self.style.border_top or
                 self.style.border_right or self.style.border_bottom):
