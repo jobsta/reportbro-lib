@@ -382,7 +382,6 @@ class TextElement(DocElement):
             remaining_height -= space_top
             text_offset_y = space_top
         if self.space_top == 0:
-            first_line = True
             while self.line_index < self.lines_count:
                 last_line = (self.line_index >= self.lines_count - 1)
                 line_height = self.text_lines[self.line_index].height
@@ -398,7 +397,6 @@ class TextElement(DocElement):
                 block_height += tmp_height
                 text_height += line_height
                 self.line_index += 1
-                first_line = False
 
         if self.line_index >= self.lines_count and self.space_bottom > 0:
             space_bottom = min(self.space_bottom, remaining_height)
