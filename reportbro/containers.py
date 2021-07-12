@@ -120,9 +120,9 @@ class Container(object):
                             render_elem, complete = elem.get_next_render_element(
                                 offset_y, container_top=container_top,
                                 container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
+                            if complete:
+                                processed_elements.append(elem)
                             if render_elem:
-                                if complete:
-                                    processed_elements.append(elem)
                                 self.render_elements.append(render_elem)
                                 self.render_elements_created = True
                                 if render_elem.render_bottom > self.used_band_height:
