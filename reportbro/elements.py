@@ -565,10 +565,11 @@ class TextBlockElement(DocElementBase):
             y += self.style.padding_top
         y += self.text_offset_y
 
-        self.lines[-1].last_line = True
-        for i, line in enumerate(self.lines):
-            line.render_pdf(self.x + container_offset_x + self.style.padding_left, y, pdf_doc=pdf_doc)
-            y += line.height
+        if self.lines:
+            self.lines[-1].last_line = True
+            for line in self.lines:
+                line.render_pdf(self.x + container_offset_x + self.style.padding_left, y, pdf_doc=pdf_doc)
+                y += line.height
 
 
 class TextLine(object):
