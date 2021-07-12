@@ -10,14 +10,16 @@
 ### Changes
 * add option to set encoding for core fonts
 
+### Bug Fixes
+* fix endless loop when rendering empty table
+    
 ## [1.6.0] - 2021-03-19
 
 ### Changes
 * allow manual page break inside section content
 
 ### Bug Fixes
-* fix returned exception for 'always on same page' setting so error can
-be displayed in ReportBro Designer
+* fix returned exception for 'always on same page' setting so error can be displayed in ReportBro Designer
 
 ## [1.5.2] - 2020-10-06
 
