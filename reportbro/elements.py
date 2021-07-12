@@ -517,7 +517,7 @@ class TextElement(DocElement):
                     Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
             for line in lines:
                 text_line = TextLine(width=available_width, style=self.used_style, link=self.prepared_link)
-                text, text_width = line
+                text, text_width, _ = line
                 text_line.add_text(text, text_width, self.used_style)
                 self.text_lines.append(text_line)
         else:
