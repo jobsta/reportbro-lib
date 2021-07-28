@@ -1,8 +1,8 @@
 # Always prefer setuptools over distutils
 from setuptools import setup, find_packages
+from distutils.util import convert_path
 from codecs import open
 from os import path
-from reportbro import __version__
 
 here = path.abspath(path.dirname(__file__))
 
@@ -10,9 +10,14 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+version_info = {}
+version_path = convert_path('reportbro/version.py')
+with open(version_path) as version_file:
+    exec(version_file.read(), version_info)
+
 setup(
     name='reportbro-lib',
-    version=__version__,
+    version=version_info['__version__'],
     description='Generate PDF and Excel reports from visually designed templates',
     long_description=long_description,
     url='https://www.reportbro.com',
