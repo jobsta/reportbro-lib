@@ -493,12 +493,15 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_formats[self.used_style.id]
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        content = self.text_lines[0] if self.text_lines else ''
+        content = self.get_spreadsheet_content()
         renderer.write(row, col, self.spreadsheet_colspan, content, cell_format,
                        self.width, url=self.prepared_link)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + (self.spreadsheet_colspan if self.spreadsheet_colspan else 1)
+
+    def get_spreadsheet_content(self):
+        return self.text_lines[0] if self.text_lines else ''
 
     def set_font_by_style(self, style, pdf_doc):
         if not pdf_doc.set_font(
