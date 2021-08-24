@@ -703,15 +703,14 @@ class TableTextElement(TextElement):
                 column_data_parameter = param_ref.parameter
                 if column_data_parameter.type == ParameterType.simple_array:
                     cell_values, value_exists = Context.get_parameter_data(param_ref)
-                    if value_exists:
-                        if len(cell_values) > 0:
-                            self.simple_array_param = column_data_parameter
-                            self.simple_array_item_index = 0
-                            for i in range(1, len(cell_values)):
-                                expanded_cell = TableTextElement(
-                                    self.report, self.data,
-                                    simple_array_param=column_data_parameter, simple_array_item_index=i)
-                                printed_cells.append(expanded_cell)
+                    if value_exists and cell_values and len(cell_values) > 0:
+                        self.simple_array_param = column_data_parameter
+                        self.simple_array_item_index = 0
+                        for i in range(1, len(cell_values)):
+                            expanded_cell = TableTextElement(
+                                self.report, self.data,
+                                simple_array_param=column_data_parameter, simple_array_item_index=i)
+                            printed_cells.append(expanded_cell)
 
     def fill_parameters(self, ctx):
         if self.simple_array_param is not None:
