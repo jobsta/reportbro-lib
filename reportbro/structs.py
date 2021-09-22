@@ -16,6 +16,9 @@ class Color:
             self.transparent = False
             self.color_code = color
         else:
+            self.r = 0
+            self.g = 0
+            self.b = 0
             self.transparent = True
             self.color_code = ''
 
