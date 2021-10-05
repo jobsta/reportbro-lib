@@ -51,7 +51,7 @@ setup(
         'enum34',
         'reportbro-fpdf>=1.7.10',
         'Pillow>=4.0',
-        'simpleeval>=0.9.10',
+        'reportbro-simpleeval>=0.9.11',
         'qrcode>=6.1',
         'typing;python_version<"3.5"',
         'xlsxwriter'
