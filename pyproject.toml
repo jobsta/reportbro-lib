@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "reportbro-lib"
+version = "2.0.1"
+description = "Generate PDF and Excel reports from visually designed templates"
+authors = ["jobsta <alex@reportbro.com>"]
+license = "AGPL-3.0"
+readme = "README.rst"
+
+homepage = "https://www.reportbro.com"
+repository = "https://github.com/jobsta/reportbro-lib"
+documentation = "https://www.reportbro.com/doc/installation"
+
+keywords = ["pdf", "excel", "report", "generate", "create", "web", "template", "layout"]
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 2",
+    "Programming Language :: Python :: 2.7",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10"
+]
+
+packages = [
+    { include = "reportbro" },
+]
+
+include = ["data/logo_watermark.png"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+Babel = "^2.9.1"
+reportbro-fpdf = "^1.7.11"
+reportbro-simpleeval = "^0.9.11"
+Pillow = ">=4.0"
+qrcode = "^7.3.1"
+XlsxWriter = "^3.0.2"
+enum34 = { version = "^1.1.10", python = "<3.4" }
+typing = { version = "^3.10.0", python = "<3.5" }
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
