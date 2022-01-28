@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] - 2022-01-28
+
+### Bug Fixes
+* Use own simpleeval lib to fix compatibility issue with setuptools (>= 58)
+* Avoid error for rich text without content
+
 ## [2.0.0] - 2021-08-06
 
 ### Features
