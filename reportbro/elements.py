@@ -213,9 +213,8 @@ class TextElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = data.get('content', '')
         self.rich_text = bool(data.get('richText'))
-        self.rich_text_content = data.get('richTextContent', {})
-        if self.rich_text and (not isinstance(self.rich_text_content, dict) or
-                               not isinstance(self.rich_text_content.get('ops'), list)):
+        self.rich_text_content = data.get('richTextContent') or {}
+        if self.rich_text and not isinstance(self.rich_text_content, dict):
             raise RuntimeError('Invalid richTextContent for text element {id}'.format(id=self.id))
         self.eval = bool(data.get('eval'))
         if data.get('styleId'):
