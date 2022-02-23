@@ -132,9 +132,11 @@ class DocElement(DocElementBase):
                         RenderElementType.complete, RenderElementType.first):
                 pdf_doc.line(border_x, border_y, border_x + border_width, border_y)
             if border_style.border_right:
-                pdf_doc.line(border_x + border_width, border_y,
-                        border_x + border_width, border_y + border_height)
+                pdf_doc.line(
+                    border_x + border_width, border_y,
+                    border_x + border_width, border_y + border_height)
             if border_style.border_bottom and render_element_type in (
                         RenderElementType.complete, RenderElementType.last):
-                pdf_doc.line(border_x, border_y + border_height,
-                        border_x + border_width, border_y + border_height)
+                pdf_doc.line(
+                    border_x, border_y + border_height,
+                    border_x + border_width, border_y + border_height)
