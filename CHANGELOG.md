@@ -2,6 +2,9 @@
 
 ## Upcoming Release
 
+### Changes
+* Support "Print if" condition for page break
+
 ### Bug Fixes
 * Fix rendering table inside section with same data source
 
