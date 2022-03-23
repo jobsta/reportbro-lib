@@ -203,6 +203,7 @@ class PageBreakElement(DocElementBase):
     def __init__(self, report, data):
         DocElementBase.__init__(self, report, data)
         self.id = get_int_value(data, 'id')
+        self.print_if = get_str_value(data, 'printIf')
         self.x = 0
         self.width = 0
         self.sort_order = 0  # sort order for elements with same 'y'-value, render page break before other elements
