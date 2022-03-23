@@ -17,6 +17,10 @@ from .errors import Error, ReportBroError
 # the context_id (this is usually the data map but can be different for collection
 # parameters)
 ParameterRef = namedtuple('ParameterRef', ['parameter', 'data', 'data_context'])
+ContextEntry = namedtuple('ContextEntry', ['parameters', 'data', 'prev_entry'])
+CONTEXT_ENTRY_PARAMETERS = 0
+CONTEXT_ENTRY_DATA = 1
+CONTEXT_ENTRY_PREV_ENTRY = 2
 
 
 class Context:
@@ -24,21 +28,20 @@ class Context:
         self.report = report
         self.pattern_locale = report.document_properties.pattern_locale
         self.pattern_currency_symbol = report.document_properties.pattern_currency_symbol
-        self.parameters = parameters
-        self.data = data
-        self.data.update(EVAL_DEFAULT_NAMES)
+        data.update(EVAL_DEFAULT_NAMES)
+        # each new context (push_context) gets a new unique id
+        self.id = 1
+        data['__context_id'] = self.id
         self.eval_functions = EVAL_DEFAULT_FUNCTIONS.copy()
         self.eval_functions.update(
             len=len,
             decimal=decimal.Decimal,
             datetime=datetime
         )
-        # each new context (push_context) gets a new unique id
-        self.id = 1
-        self.data['__context_id'] = self.id
         self.root_data = data
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0
+        self.context_stack = [ContextEntry(parameters=parameters, data=data, prev_entry=None)]
 
     def get_parameter(self, name):
         """Return parameter reference for given parameter name.
@@ -54,8 +57,7 @@ class Context:
             name_parts = name.split('.')
             collection_name = name_parts[0]
             field_name = name_parts[1]
-            param_ref = self._get_parameter(
-                collection_name, parameters=self.parameters, data=self.data)
+            param_ref = self._get_parameter(collection_name)
             if param_ref is not None and param_ref.parameter.type == ParameterType.map and\
                     field_name in param_ref.parameter.fields and collection_name in param_ref.data:
                 return ParameterRef(
@@ -63,14 +65,20 @@ class Context:
                     data=param_ref.data[collection_name], data_context=param_ref.data)
             return None
         else:
-            return self._get_parameter(name, parameters=self.parameters, data=self.data)
+            return self._get_parameter(name)
 
-    def _get_parameter(self, name, parameters, data):
+    def _get_parameter(self, name, context_entry=None):
+        if context_entry is None:
+            context_entry = self.context_stack[-1]
+        parameters = context_entry[CONTEXT_ENTRY_PARAMETERS]
+
         if name in parameters:
+            data = context_entry[CONTEXT_ENTRY_DATA]
             return ParameterRef(parameter=parameters[name], data=data, data_context=data)
-        elif parameters.get('__parent') and data.get('__parent'):
-            return self._get_parameter(
-                name, parameters=parameters.get('__parent'), data=data.get('__parent'))
+        else:
+            parent_context_entry = context_entry[CONTEXT_ENTRY_PREV_ENTRY]
+            if parent_context_entry:
+                return self._get_parameter(name, context_entry=parent_context_entry)
         return None
 
     @staticmethod
@@ -101,34 +109,28 @@ class Context:
             return param_ref.data_context['__context_id']
         return None
 
-    def get_data(self, name, data=None):
-        if data is None:
-            data = self.data
+    def get_data(self, name, context_entry=None):
+        if context_entry is None:
+            context_entry = self.context_stack[-1]
+        data = context_entry[CONTEXT_ENTRY_DATA]
         if name in data:
             return data[name], True
-        elif data.get('__parent'):
-            return self.get_data(name, data.get('__parent'))
+        else:
+            parent_context_entry = context_entry[CONTEXT_ENTRY_PREV_ENTRY]
+            if parent_context_entry:
+                return self.get_data(name, context_entry=parent_context_entry)
         return None, False
 
     def push_context(self, parameters, data):
-        parameters['__parent'] = self.parameters
-        self.parameters = parameters
-        data['__parent'] = self.data
         self.id += 1
         data['__context_id'] = self.id
-        self.data = data
+        current_context_entry = self.context_stack[-1]
+        self.context_stack.append(ContextEntry(parameters=parameters, data=data, prev_entry=current_context_entry))
 
     def pop_context(self):
-        parameters = self.parameters.get('__parent')
-        if parameters is None:
-            raise RuntimeError('Context.pop_context failed - no parent available')
-        del self.parameters['__parent']
-        self.parameters = parameters
-        data = self.data.get('__parent')
-        if data is None:
-            raise RuntimeError('Context.pop_context failed - no parent available')
-        del self.data['__parent']
-        self.data = data
+        if len(self.context_stack) <= 1:
+            raise RuntimeError('Context.pop_context failed')
+        self.context_stack = self.context_stack[:-1]
 
     def fill_parameters(self, expr, object_id, field, pattern=None):
         if expr.find('${') == -1:

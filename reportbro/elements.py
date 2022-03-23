@@ -768,8 +768,8 @@ class TableElement(DocElement):
             if column_count is not None:
                 assert column_count == len(self.footer.cells)
 
-        self.print_header = self.header is not None
-        self.print_footer = self.footer is not None
+        self.print_header = False
+        self.print_footer = False
         self.border = Border[data.get('border')]
         self.border_color = Color(data.get('borderColor'))
         self.border_width = get_float_value(data, 'borderWidth')
@@ -795,6 +795,7 @@ class TableElement(DocElement):
 
     def prepare(self, ctx, pdf_doc, only_verify):
         if self.header:
+            self.print_header = True
             free_space = 0  # space freed up by hidden columns
             total_weight = 0
             for column_idx, cell in enumerate(self.header.cells):
@@ -824,6 +825,9 @@ class TableElement(DocElement):
                             content_row.cells[column_idx].width = cell.width
                         if self.footer:
                             self.footer.cells[column_idx].width = cell.width
+
+        if self.footer:
+            self.print_footer = True
 
         parameter_name = Context.strip_parameter_name(self.data_source)
         if parameter_name:
