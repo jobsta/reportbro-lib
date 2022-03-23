@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming Release
+
+### Bug Fixes
+* Fix rendering table inside section with same data source
+
 ## [2.0.1] - 2022-01-28
 
 ### Bug Fixes
