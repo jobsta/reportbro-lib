@@ -59,7 +59,7 @@ class ImageElement(DocElement):
                 if param_ref:
                     source_parameter = param_ref.parameter
                     if source_parameter.type == ParameterType.string:
-                        self.image_key, _ = Context.get_parameter_data(param_ref)
+                        self.image_key, _ = ctx.get_parameter_data(param_ref)
                     elif source_parameter.type == ParameterType.image:
                         self.image_key = self.source + '_' +\
                                          str(Context.get_parameter_context_id(param_ref))
@@ -702,7 +702,7 @@ class TableTextElement(TextElement):
             if param_ref:
                 column_data_parameter = param_ref.parameter
                 if column_data_parameter.type == ParameterType.simple_array:
-                    cell_values, value_exists = Context.get_parameter_data(param_ref)
+                    cell_values, value_exists = ctx.get_parameter_data(param_ref)
                     if value_exists and cell_values and len(cell_values) > 0:
                         self.simple_array_param = column_data_parameter
                         self.simple_array_item_index = 0
@@ -716,7 +716,7 @@ class TableTextElement(TextElement):
         if self.simple_array_param is not None:
             param_ref = ctx.get_parameter(self.simple_array_param.name)
             if param_ref:
-                cell_values, value_exists = Context.get_parameter_data(param_ref)
+                cell_values, value_exists = ctx.get_parameter_data(param_ref)
                 if value_exists and self.simple_array_item_index < len(cell_values):
                     simple_array_item_value = cell_values[self.simple_array_item_index]
                     return ctx.get_formatted_value(
@@ -738,6 +738,7 @@ class TableElement(DocElement):
         self.row_index_after_main_content = -1
         self.has_table_band_group = False
         self.footer = None
+        self.data_source_parameter = None
 
         column_count = None
         if bool(data.get('header')):
@@ -836,13 +837,13 @@ class TableElement(DocElement):
             if param_ref is None:
                 raise ReportBroError(
                     Error('errorMsgMissingParameter', object_id=self.id, field='dataSource'))
-            data_source_parameter = param_ref.parameter
-            if data_source_parameter.type != ParameterType.array:
+            self.data_source_parameter = param_ref.parameter
+            if self.data_source_parameter.type != ParameterType.array:
                 raise ReportBroError(
                     Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
-            for row_parameter in data_source_parameter.children:
+            for row_parameter in self.data_source_parameter.children:
                 self.row_parameters[row_parameter.name] = row_parameter
-            self.rows, parameter_exists = Context.get_parameter_data(param_ref)
+            self.rows, parameter_exists = ctx.get_parameter_data(param_ref)
             if not parameter_exists:
                 raise ReportBroError(
                     Error('errorMsgMissingData', object_id=self.id, field='dataSource'))
@@ -852,6 +853,7 @@ class TableElement(DocElement):
         else:
             # there is no data source parameter so we create a static table (faked by one empty data row)
             self.rows = [dict()]
+            self.data_source_parameter = None
 
         self.row_count = len(self.rows)
         self.row_index = 0
@@ -878,8 +880,8 @@ class TableElement(DocElement):
                     table_width_initialized = True
             ctx.pop_context()
 
-        # set group expression result for first row
-        self.set_group_expr_result(ctx)
+        self.init_group_rows(ctx=ctx)
+
         if only_verify:
             # call prepare for each content band in each row to verify
             # group and print-if expressions
@@ -888,10 +890,9 @@ class TableElement(DocElement):
                 # push data context of current row so values of current row can be accessed
                 ctx.push_context(self.row_parameters, self.rows[self.row_index])
                 for content_row in self.content_rows:
-                    content_row.prepare(ctx=ctx)
+                    content_row.prepare(ctx=ctx, row_index=self.row_index)
                 ctx.pop_context()
                 self.row_index += 1
-                self.set_group_expr_result(ctx)
 
         if self.footer:
             self.footer.set_printed_cells(ctx)
@@ -927,7 +928,7 @@ class TableElement(DocElement):
                 # row which is repeated on every page
                 if not first_row_on_page or self.content_row_index >= first_content_row_index or\
                         content_row.repeat_group_header:
-                    content_row.prepare(ctx=ctx)
+                    content_row.prepare(ctx=ctx, row_index=self.row_index)
                     if content_row.repeat_group_header and first_row_on_page:
                         # group content row is repeated on every page
                         content_row.group_changed = True
@@ -940,8 +941,12 @@ class TableElement(DocElement):
                             ctx.pop_context()
                             return render_element, False
 
+                        content_row.set_parameter_range(parameter=self.data_source_parameter, ctx=ctx)
+
                         content_row.create_render_elements(
                             offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+
+                        content_row.set_parameter_range(parameter=self.data_source_parameter, ctx=ctx, clear=True)
 
                         render_element.add_band(content_row, row_index=self.row_index)
                         if not content_row.rendering_complete:
@@ -961,7 +966,6 @@ class TableElement(DocElement):
 
             self.row_index += 1
             first_row_on_page = False
-            self.set_group_expr_result(ctx)
 
         if self.row_index >= self.row_count and self.print_footer:
             self.footer.create_render_elements(
@@ -980,19 +984,42 @@ class TableElement(DocElement):
         self.render_bottom = render_element.render_bottom
         return render_element, self.rendering_complete
 
-    def set_group_expr_result(self, ctx):
-        if self.has_table_band_group and self.row_index < self.row_count:
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+    def init_group_rows(self, ctx):
+        """
+        Initialize table group bands (e.g. to show header or sums for grouped rows) and
+        set row index when a group band is printed.
+
+        :param ctx: current context
+        """
+        if self.has_table_band_group:
+            row_index = 0
+            content_group_rows = []
             for content_row in self.content_rows:
-                content_row.set_group_expression(ctx)
+                if content_row.group_expression:
+                    content_row.group_changed_row_indices = []
+                    content_group_rows.append(content_row)
+
+            # set next group expr which is used for group expr of first row
+            ctx.push_context(self.row_parameters, self.rows[row_index])
+            for content_group_row in content_group_rows:
+                content_group_row.set_next_group_expression(ctx)
             ctx.pop_context()
 
-        if self.row_index_after_main_content != -1 and (self.row_index + 1) < self.row_count:
-            # set group expression result for next row
-            ctx.push_context(self.row_parameters, self.rows[self.row_index+1])
-            for content_row in self.content_rows[self.row_index_after_main_content:]:
-                content_row.set_next_group_expression(ctx)
-            ctx.pop_context()
+            while row_index < self.row_count:
+                has_next = (row_index + 1) < self.row_count
+                # set context for next row (if available) so group expr of next row can be evaluated
+                if has_next:
+                    ctx.push_context(self.row_parameters, self.rows[row_index + 1])
+                for content_group_row in content_group_rows:
+                    # set group expression for next row so the group expressions for previous, next and current
+                    # row are available
+                    content_group_row.set_next_group_expression(ctx, has_next=has_next)
+                    # now test if the group expression (prev <-> current for group before content or
+                    # current <-> next for group after content has changed)
+                    content_group_row.test_group_changed(row_index)
+                if has_next:
+                    ctx.pop_context()
+                row_index += 1
 
     def is_rendering_complete(self):
         # test if footer and all content rows are completely rendered
@@ -1020,7 +1047,7 @@ class TableElement(DocElement):
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index])
             for i, content_row in enumerate(self.content_rows):
-                content_row.prepare(ctx=ctx)
+                content_row.prepare(ctx=ctx, row_index=self.row_index)
                 if content_row.is_printed(ctx=ctx):
                     if columns == 0:
                         # get column count from first printed content row if there is no header
@@ -1029,7 +1056,6 @@ class TableElement(DocElement):
                         row, col, ctx, renderer, row_index=self.row_index)
             ctx.pop_context()
             self.row_index += 1
-            self.set_group_expr_result(ctx)
 
         if self.footer:
             row, _ = self.footer.render_spreadsheet(row, col, ctx, renderer)
@@ -1070,10 +1096,14 @@ class TableBandElement(object):
             self.always_print_on_same_page = True
         self.cells = []  # cells created from initial data as defined in Designer
         self.print_if_result = True
+
         self.group_changed = False
         self.group_expr_result = None
         self.prev_group_expr_result = None
         self.next_group_expr_result = None
+        self.group_changed_row_indices = []
+        self.group_row_index_start = 0
+        self.group_row_index_end = 0
 
         # cells which will be printed, this excludes cells within a colspan of another cells
         # and can include additional cells which get expanded by a cell
@@ -1127,48 +1157,73 @@ class TableBandElement(object):
             self.container.add(cell)
         self.container.width = table_width
 
-    def set_group_expression(self, ctx):
-        """Set and if necessary evaluate group expression for current row.
-
-        The group expression result of previous row is also set.
-
-        :param ctx: context where parameters of current row are pushed.
-        """
-        if self.group_expression:
-            self.prev_group_expr_result = self.group_expr_result
-            # if the group expression result from next row is
-            # available we will use it, otherwise the expression will be evaluated
-            if self.next_group_expr_result is None:
-                self.group_expr_result = ctx.evaluate_expression(
-                    self.group_expression, self.id, field='groupExpression')
-            else:
-                self.group_expr_result = self.next_group_expr_result
-            self.next_group_expr_result = None
-
-    def set_next_group_expression(self, ctx):
-        """Evaluate group expression of next row.
-
-        This is needed if this table band is after the main content band and
-        has a group expression, i.e. the band will only be printed
-        if the current group expression is different than the expression
-        of the next row.
+    def set_next_group_expression(self, ctx, has_next=True):
+        """Evaluate group expression of next row and set group expression of
+        previous and current row accordingly.
 
         :param ctx: context where parameters of next row are pushed.
+        :param has_next: True if next row exists.
         """
-        if self.group_expression:
+        self.prev_group_expr_result = self.group_expr_result
+        self.group_expr_result = self.next_group_expr_result
+        if has_next:
             self.next_group_expr_result = ctx.evaluate_expression(
                 self.group_expression, self.id, field='groupExpression')
+        else:
+            self.next_group_expr_result = None
 
-    def prepare(self, ctx):
+    def test_group_changed(self, row_index):
+        """
+        Test if group expression changed and store the row_index if this is the case.
+
+        :param row_index: current row index, group expression for previous, current and next row must
+        be set before with :func:`~TableBandElement.set_next_group_expression`
+        """
         if self.group_expression:
             if self.before_group:
-                self.group_changed = (self.group_expr_result != self.prev_group_expr_result)
+                if self.group_expr_result != self.prev_group_expr_result:
+                    self.group_changed_row_indices.append(row_index)
             else:
-                self.group_changed = (self.group_expr_result != self.next_group_expr_result)
+                if self.group_expr_result != self.next_group_expr_result:
+                    self.group_changed_row_indices.append(row_index)
+
+    def prepare(self, ctx, row_index=None):
+        if self.group_expression:
+            self.group_changed = False
+            if self.group_changed_row_indices and self.group_changed_row_indices[0] == row_index:
+                # the group expression has changed for this row index -> group band will be printed
+                self.group_changed = True
+                # now set index range which is used for function parameters like sum/avg
+                if self.before_group:
+                    self.group_row_index_start = self.group_changed_row_indices.pop(0)
+                    if self.group_changed_row_indices:
+                        self.group_row_index_end = self.group_changed_row_indices[0]
+                    else:
+                        self.group_row_index_end = -1
+                else:
+                    self.group_row_index_start = self.group_row_index_end
+                    self.group_row_index_end = self.group_changed_row_indices.pop(0) + 1
 
         if self.print_if:
             self.print_if_result = ctx.evaluate_expression(
                 self.print_if, self.id, field='printIf')
+
+    def set_parameter_range(self, parameter, ctx, clear=False):
+        """
+        Set start and end row index for the given parameter which is used when evaluating a parameter
+        function (e.g. sum or avg).
+
+        :param parameter: data source parameter of table
+        :param ctx: current context
+        :param clear: if True the range will be removed for the parameter
+        """
+        if self.group_expression:
+            if clear:
+                parameter.clear_range()
+                ctx.dec_range_count()
+            else:
+                parameter.set_range(self.group_row_index_start, self.group_row_index_end)
+                ctx.inc_range_count()
 
     def is_printed(self, ctx):
         return self.print_if_result and (not self.group_expression or self.group_changed)
@@ -1535,7 +1590,7 @@ class SectionElement(DocElement):
                 Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
         for row_parameter in data_source_parameter.children:
             self.row_parameters[row_parameter.name] = row_parameter
-        self.rows, parameter_exists = Context.get_parameter_data(param_ref)
+        self.rows, parameter_exists = ctx.get_parameter_data(param_ref)
         if not parameter_exists:
             raise ReportBroError(
                 Error('errorMsgMissingData', object_id=self.id, field='dataSource'))

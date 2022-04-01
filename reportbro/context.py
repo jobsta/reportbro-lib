@@ -6,6 +6,7 @@ from collections import namedtuple
 from simpleeval import simple_eval, NameNotDefined, FunctionNotDefined
 from simpleeval import DEFAULT_NAMES as EVAL_DEFAULT_NAMES
 from simpleeval import DEFAULT_FUNCTIONS as EVAL_DEFAULT_FUNCTIONS
+from typing import List
 import datetime
 import decimal
 
@@ -41,10 +42,14 @@ class Context:
         self.root_data = data
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0
-        self.context_stack = [ContextEntry(parameters=parameters, data=data, prev_entry=None)]
+        self.context_stack: List[ContextEntry] = [ContextEntry(parameters=parameters, data=data, prev_entry=None)]
+        # a range count is increased inside a table group band (e.g. to show header or sums for grouped rows),
+        # if a range is set we have to evaluate parameter functions (e.g. sum/avg) because the range could be affected
+        self.range_count = 0
 
     def get_parameter(self, name):
-        """Return parameter reference for given parameter name.
+        """
+        Return parameter reference for given parameter name.
 
         :param name: name of the parameter to find, the parameter can be present in the current
         context or any of its parents.
@@ -81,21 +86,25 @@ class Context:
                 return self._get_parameter(name, context_entry=parent_context_entry)
         return None
 
-    @staticmethod
-    def get_parameter_data(param_ref):
-        """Return data for given parameter reference.
+    def get_parameter_data(self, param_ref):
+        """
+        Return data for given parameter reference.
 
         :param param_ref: a parameter reference which contains a parameter instance and
         its data map referenced by the parameter.
         :return: tuple of current data value of parameter, bool if parameter data exists
         """
-        if param_ref.parameter.name in param_ref.data:
-            return param_ref.data[param_ref.parameter.name], True
+        parameter = param_ref.parameter
+        if self.range_count and parameter.is_range_function():
+            return self.evaluate_parameter_func(parameter)
+        elif parameter.name in param_ref.data:
+            return param_ref.data[parameter.name], True
         return None, False
 
     @staticmethod
     def get_parameter_context_id(param_ref):
-        """Return context_id for given parameter reference.
+        """
+        Return context_id for given parameter reference.
 
         This can be useful to find out if a parameter value has changed,
         e.g. parameter 'amount' in a list of invoice items has a different context_id
@@ -108,18 +117,6 @@ class Context:
         if '__context_id' in param_ref.data_context:
             return param_ref.data_context['__context_id']
         return None
-
-    def get_data(self, name, context_entry=None):
-        if context_entry is None:
-            context_entry = self.context_stack[-1]
-        data = context_entry[CONTEXT_ENTRY_DATA]
-        if name in data:
-            return data[name], True
-        else:
-            parent_context_entry = context_entry[CONTEXT_ENTRY_PREV_ENTRY]
-            if parent_context_entry:
-                return self.get_data(name, context_entry=parent_context_entry)
-        return None, False
 
     def push_context(self, parameters, data):
         self.id += 1
@@ -135,16 +132,16 @@ class Context:
     def fill_parameters(self, expr, object_id, field, pattern=None):
         if expr.find('${') == -1:
             return expr
-        ret = ''
+        rv = ''
         prev_c = None
         parameter_index = -1
         for i, c in enumerate(expr):
             if parameter_index == -1:
                 if prev_c == '$' and c == '{':
                     parameter_index = i + 1
-                    ret = ret[:-1]
+                    rv = rv[:-1]
                 else:
-                    ret += c
+                    rv += c
             else:
                 if c == '}':
                     parameter_name = expr[parameter_index:i]
@@ -153,7 +150,7 @@ class Context:
                         raise ReportBroError(
                             Error('errorMsgInvalidExpressionNameNotDefined',
                                   object_id=object_id, field=field, info=parameter_name))
-                    value, value_exists = Context.get_parameter_data(param_ref)
+                    value, value_exists = self.get_parameter_data(param_ref)
 
                     if not value_exists:
                         raise ReportBroError(
@@ -161,10 +158,10 @@ class Context:
                                   object_id=object_id, field=field, info=parameter_name))
 
                     if value is not None:
-                        ret += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+                        rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
                     parameter_index = -1
             prev_c = c
-        return ret
+        return rv
 
     def evaluate_expression(self, expr, object_id, field):
         if expr:
@@ -190,6 +187,48 @@ class Context:
                 raise ReportBroError(
                     Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=info, context=expr))
         return True
+
+    def evaluate_parameter_func(self, parameter):
+        expr = Context.strip_parameter_name(parameter.expression)
+        pos = expr.find('.')
+        if pos == -1:
+            raise ReportBroError(
+                Error('errorMsgInvalidAvgSumExpression',
+                      object_id=parameter.id, field='expression', context=parameter.name))
+        else:
+            parameter_name = expr[:pos]
+            parameter_field = expr[pos+1:]
+            param_ref = self.get_parameter(parameter_name)
+            if param_ref is None or param_ref.parameter.type != ParameterType.array:
+                raise ReportBroError(
+                    Error('errorMsgInvalidAvgSumExpression',
+                          object_id=parameter.id, field='expression', context=parameter.name))
+            else:
+                total = decimal.Decimal(0)
+                items, data_exists = self.get_parameter_data(param_ref)
+                if not data_exists or not isinstance(items, list):
+                    raise ReportBroError(
+                        Error('errorMsgInvalidAvgSumExpression',
+                              object_id=parameter.id, field='expression', context=parameter.name))
+
+                start, end = param_ref.parameter.get_range()
+                if start is not None:
+                    items = items[start:(end if end != -1 else len(items))]
+
+                for item in items:
+                    item_value = item.get(parameter_field)
+                    if not isinstance(item_value, decimal.Decimal):
+                        raise ReportBroError(
+                            Error('errorMsgInvalidAvgSumExpression',
+                                  object_id=parameter.id, field='expression', context=parameter.name))
+                    total += item_value
+
+                value = None
+                if parameter.type == ParameterType.average:
+                    value = total / len(items)
+                elif parameter.type == ParameterType.sum:
+                    value = total
+                return value, True
 
     @staticmethod
     def strip_parameter_name(expr):
@@ -242,41 +281,41 @@ class Context:
                 rv = str(value)
         return rv
 
-    def replace_parameters(self, expr, data=None):
+    def replace_parameters(self, expr, data):
         pos = expr.find('${')
         if pos == -1:
             return expr
-        ret = ''
+        rv = ''
         pos2 = 0
         while pos != -1:
             if pos != 0:
-                ret += expr[pos2:pos]
+                rv += expr[pos2:pos]
             pos2 = expr.find('}', pos)
             if pos2 != -1:
                 parameter_name = expr[pos+2:pos2]
-                if data is not None:
-                    if parameter_name.find('.') != -1:
-                        name_parts = parameter_name.split('.')
-                        collection_name = name_parts[0]
-                        field_name = name_parts[1]
-                        value, parameter_exists = self.get_data(collection_name)
-                        if isinstance(value, dict):
-                            value = value.get(field_name)
-                        else:
-                            value = None
-                        # use valid python identifier for parameter name
-                        parameter_name = collection_name + '_' + field_name
-                    else:
-                        value, parameter_exists = self.get_data(parameter_name)
-                    data[parameter_name] = value
-                ret += parameter_name
+
+                param_ref = self.get_parameter(parameter_name)
+                parameter_name = parameter_name.replace('.', '_')
+                if param_ref:
+                    value, _ = self.get_parameter_data(param_ref)
+                else:
+                    value = None
+
+                data[parameter_name] = value
+                rv += parameter_name
                 pos2 += 1
                 pos = expr.find('${', pos2)
             else:
                 pos2 = pos
                 pos = -1
-        ret += expr[pos2:]
-        return ret
+        rv += expr[pos2:]
+        return rv
+
+    def inc_range_count(self):
+        self.range_count += 1
+
+    def dec_range_count(self):
+        self.range_count -= 1
 
     def inc_page_number(self):
         self.root_data['page_number'] += 1

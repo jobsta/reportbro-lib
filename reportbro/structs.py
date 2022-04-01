@@ -47,21 +47,48 @@ class Parameter:
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = (self.pattern.find('$') != -1)
         self.is_internal = self.name in ('page_count', 'page_number', 'row_number')
+        self.range_stack = []
         self.children = []
         self.fields = dict()
         if self.type == ParameterType.array or self.type == ParameterType.map:
             for item in data.get('children'):
                 parameter = Parameter(self.report, item)
                 if parameter.name in self.fields:
-                    self.report.errors.append(Error('errorMsgDuplicateParameterField',
-                            object_id=parameter.id, field='name'))
+                    self.report.errors.append(
+                        Error('errorMsgDuplicateParameterField', object_id=parameter.id, field='name'))
                 else:
                     self.children.append(parameter)
                     self.fields[parameter.name] = parameter
 
     def is_evaluated(self):
         """Return True if parameter data must be evaluated initially."""
-        return self.eval or self.type in (ParameterType.average, ParameterType.sum)
+        return self.eval or self.is_range_function()
+
+    def is_range_function(self):
+        """Return True if parameter is a function with range input."""
+        return self.type in (ParameterType.average, ParameterType.sum)
+
+    def set_range(self, row_start, row_end):
+        """
+        Set row range which is used for parameter functions (e.g. sum/avg), if a range is set then
+        only these rows will be used for the function, otherwise all rows are used.
+
+        :param row_start: first row of group
+        :param row_end: index after last row of group
+        """
+        self.range_stack.append((row_start, row_end))
+
+    def clear_range(self):
+        """Clear previously set row range."""
+        self.range_stack.pop()
+
+    def get_range(self):
+        if self.range_stack:
+            return self.range_stack[-1]
+        return None, None
+
+    def has_range(self):
+        return bool(self.range_stack)
 
 
 class BorderStyle:

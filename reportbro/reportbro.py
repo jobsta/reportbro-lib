@@ -303,12 +303,12 @@ class ImageData:
                 if param_ref:
                     source_parameter = param_ref.parameter
                     if source_parameter.type == ParameterType.string:
-                        image_uri, _ = Context.get_parameter_data(param_ref)
+                        image_uri, _ = ctx.get_parameter_data(param_ref)
                     elif source_parameter.type == ParameterType.image:
                         # image is available as base64 encoded or
                         # file object (only possible if report data is passed directly from python code
                         # and not via web request)
-                        img_data, _ = Context.get_parameter_data(param_ref)
+                        img_data, _ = ctx.get_parameter_data(param_ref)
                         if isinstance(img_data, BufferedReader) or\
                                 (PY2 and isinstance(img_data, file)):
                             self.image_fp = img_data
@@ -818,7 +818,7 @@ class Report:
                     if eval_fields:
                         param_ref = self.context.get_parameter(parameter.name)
                         if param_ref is not None:
-                            rows, data_exists = Context.get_parameter_data(param_ref)
+                            rows, data_exists = self.context.get_parameter_data(param_ref)
                             if data_exists:
                                 row_parameters = dict()
                                 for row_parameter in parameter.children:
@@ -839,7 +839,7 @@ class Report:
 
         parameter_type = parameter.type
         if parameter_type in (ParameterType.average, ParameterType.sum):
-            self.evaluate_parameter_func(parameter, data, dest_data=dest_data)
+            value, valid_value = self.context.evaluate_parameter_func(parameter)
         else:
             value = self.context.evaluate_expression(
                 parameter.expression, parameter.id, field='expression')
@@ -870,55 +870,13 @@ class Report:
                     if not isinstance(value, datetime.datetime):
                         value = datetime.datetime(value.year, value.month, value.day)
 
-            if valid_value:
-                if dest_data is not None:
-                    dest_data[parameter.name] = value
-                else:
-                    data[parameter.name] = value
-            else:
+            if not valid_value:
                 self.errors.append(Error(
                     'errorMsgInvalidExpressionType',
                     object_id=parameter.id, field='expression', context=parameter.name))
 
-    def evaluate_parameter_func(self, parameter, data, dest_data):
-        expr = Context.strip_parameter_name(parameter.expression)
-        pos = expr.find('.')
-        if pos == -1:
-            self.errors.append(Error(
-                'errorMsgInvalidAvgSumExpression',
-                object_id=parameter.id, field='expression', context=parameter.name))
-        else:
-            parameter_name = expr[:pos]
-            parameter_field = expr[pos+1:]
-            param_ref = self.context.get_parameter(parameter_name)
-            if param_ref is None or param_ref.parameter.type != ParameterType.array:
-                self.errors.append(Error(
-                    'errorMsgInvalidAvgSumExpression',
-                    object_id=parameter.id, field='expression', context=parameter.name))
+        if valid_value:
+            if dest_data is not None:
+                dest_data[parameter.name] = value
             else:
-                total = decimal.Decimal(0)
-                items, data_exists = self.context.get_parameter_data(param_ref)
-                if not data_exists or not isinstance(items, list):
-                    self.errors.append(Error(
-                        'errorMsgInvalidAvgSumExpression',
-                        object_id=parameter.id, field='expression',
-                        context=parameter.name))
-
-                for item in items:
-                    item_value = item.get(parameter_field)
-                    if not isinstance(item_value, decimal.Decimal):
-                        self.errors.append(Error(
-                            'errorMsgInvalidAvgSumExpression',
-                            object_id=parameter.id, field='expression',
-                            context=parameter.name))
-                        break
-                    total += item_value
-                value = None
-                if parameter.type == ParameterType.average:
-                    value = total / len(items)
-                elif parameter.type == ParameterType.sum:
-                    value = total
-                if dest_data is not None:
-                    dest_data[parameter.name] = value
-                else:
-                    data[parameter.name] = value
+                data[parameter.name] = value
