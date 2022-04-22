@@ -1,5 +1,13 @@
 # Changelog
 
+## Upcoming Release
+
+### Changes
+* Support "Print if" condition for page break
+
+### Bug Fixes
+* Fix rendering table inside section with same data source
+
 ## [2.0.1] - 2022-01-28
 
 ### Bug Fixes

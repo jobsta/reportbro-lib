@@ -27,6 +27,13 @@ def get_float_value(data, key):
     return 0.0
 
 
+def get_str_value(data, key):
+    value = data.get(key)
+    if isinstance(value, str):
+        return value
+    return ''
+
+
 def to_string(val):
     if PY2:
         if isinstance(val, str):

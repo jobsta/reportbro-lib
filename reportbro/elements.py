@@ -18,7 +18,7 @@ from .errors import Error, ReportBroError
 from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
 from .structs import Color, BorderStyle, TextStyle
-from .utils import get_float_value, get_int_value, to_string, PY2, get_image_display_size
+from .utils import get_float_value, get_int_value, get_str_value, to_string, PY2, get_image_display_size
 
 if PY2:
     import urllib2
@@ -34,15 +34,15 @@ except NameError:
 class ImageElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
-        self.source = data.get('source', '')
-        self.image = data.get('image', '')
-        self.image_filename = data.get('imageFilename', '')
+        self.source = get_str_value(data, 'source')
+        self.image = get_str_value(data, 'image')
+        self.image_filename = get_str_value(data, 'imageFilename')
         self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment')]
         self.vertical_alignment = VerticalAlignment[data.get('verticalAlignment')]
         self.background_color = Color(data.get('backgroundColor'))
-        self.print_if = data.get('printIf', '')
+        self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
-        self.link = data.get('link', '')
+        self.link = get_str_value(data, 'link')
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
@@ -117,11 +117,11 @@ class ImageElement(DocElement):
 class BarCodeElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
-        self.content = data.get('content', '')
-        self.format = data.get('format', '').lower()
+        self.content = get_str_value(data, 'content')
+        self.format = get_str_value(data, 'format').lower()
         assert self.format in ('code128', 'qrcode')
         self.display_value = bool(data.get('displayValue')) if self.format == 'code128' else False
-        error_correction_level = data.get('errorCorrectionLevel')
+        error_correction_level = get_str_value(data, 'errorCorrectionLevel')
         self.error_correction_level = qrcode.ERROR_CORRECT_M
         if error_correction_level == 'L':
             self.error_correction_level = qrcode.ERROR_CORRECT_L
@@ -189,7 +189,7 @@ class LineElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
         self.color = Color(data.get('color'))
-        self.print_if = data.get('printIf', '')
+        self.print_if = get_str_value(data, 'printIf')
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         pdf_doc.set_draw_color(self.color.r, self.color.g, self.color.b)
@@ -203,6 +203,7 @@ class PageBreakElement(DocElementBase):
     def __init__(self, report, data):
         DocElementBase.__init__(self, report, data)
         self.id = get_int_value(data, 'id')
+        self.print_if = get_str_value(data, 'printIf')
         self.x = 0
         self.width = 0
         self.sort_order = 0  # sort order for elements with same 'y'-value, render page break before other elements
@@ -211,7 +212,7 @@ class PageBreakElement(DocElementBase):
 class TextElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
-        self.content = data.get('content', '')
+        self.content = get_str_value(data, 'content')
         self.rich_text = bool(data.get('richText'))
         self.rich_text_content = data.get('richTextContent') or {}
         if self.rich_text and not isinstance(self.rich_text_content, dict):
@@ -225,10 +226,10 @@ class TextElement(DocElement):
             self.style = copy.copy(style)
         else:
             self.style = TextStyle(data)
-        self.print_if = data.get('printIf', '')
-        self.pattern = data.get('pattern', '')
-        self.link = data.get('link', '')
-        self.cs_condition = data.get('cs_condition')
+        self.print_if = get_str_value(data, 'printIf')
+        self.pattern = get_str_value(data, 'pattern')
+        self.link = get_str_value(data, 'link')
+        self.cs_condition = get_str_value(data, 'cs_condition')
         if self.cs_condition:
             if data.get('cs_styleId'):
                 style = report.styles.get(int(data.get('cs_styleId')))
@@ -730,7 +731,7 @@ class TableTextElement(TextElement):
 class TableElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
-        self.data_source = data.get('dataSource', '')
+        self.data_source = get_str_value(data, 'dataSource')
         self.columns = get_int_value(data, 'columns')
         self.header = None
         self.content_rows = []
@@ -768,12 +769,12 @@ class TableElement(DocElement):
             if column_count is not None:
                 assert column_count == len(self.footer.cells)
 
-        self.print_header = self.header is not None
-        self.print_footer = self.footer is not None
+        self.print_header = False
+        self.print_footer = False
         self.border = Border[data.get('border')]
         self.border_color = Color(data.get('borderColor'))
         self.border_width = get_float_value(data, 'borderWidth')
-        self.print_if = data.get('printIf', '')
+        self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
@@ -795,6 +796,7 @@ class TableElement(DocElement):
 
     def prepare(self, ctx, pdf_doc, only_verify):
         if self.header:
+            self.print_header = True
             free_space = 0  # space freed up by hidden columns
             total_weight = 0
             for column_idx, cell in enumerate(self.header.cells):
@@ -824,6 +826,9 @@ class TableElement(DocElement):
                             content_row.cells[column_idx].width = cell.width
                         if self.footer:
                             self.footer.cells[column_idx].width = cell.width
+
+        if self.footer:
+            self.print_footer = True
 
         parameter_name = Context.strip_parameter_name(self.data_source)
         if parameter_name:
@@ -1038,7 +1043,7 @@ class TableBandElement(object):
     def __init__(self, report, data, band_type, before_group=False):
         from .containers import Container
         assert(isinstance(data, dict))
-        self.id = data.get('id', '')
+        self.id = get_int_value(data, 'id')
         self.height = get_int_value(data, 'height')
         self.band_type = band_type
         if band_type == BandType.header:
@@ -1046,8 +1051,8 @@ class TableBandElement(object):
         else:
             self.repeat_header = None
         self.background_color = Color(data.get('backgroundColor'))
-        self.group_expression = data.get('groupExpression', '')
-        self.print_if = data.get('printIf', '')
+        self.group_expression = get_str_value(data, 'groupExpression')
+        self.print_if = get_str_value(data, 'printIf')
         self.before_group = before_group
         self.page_break = False
         self.repeat_group_header = None
@@ -1266,7 +1271,7 @@ class FrameElement(DocElement):
         from .containers import Frame
         self.background_color = Color(data.get('backgroundColor'))
         self.border_style = BorderStyle(data)
-        self.print_if = data.get('printIf', '')
+        self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
@@ -1394,7 +1399,7 @@ class SectionBandElement(object):
     def __init__(self, report, data, band_type, containers):
         from .containers import Container
         assert(isinstance(data, dict))
-        self.id = data.get('id', '')
+        self.id = get_int_value(data, 'id')
         self.width = report.document_properties.page_width -\
             report.document_properties.margin_left - report.document_properties.margin_right
         self.height = get_int_value(data, 'height')
@@ -1487,8 +1492,8 @@ class SectionBandElement(object):
 class SectionElement(DocElement):
     def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
-        self.data_source = data.get('dataSource', '')
-        self.print_if = data.get('printIf', '')
+        self.data_source = get_str_value(data, 'dataSource')
+        self.print_if = get_str_value(data, 'printIf')
         self.spreadsheet_hide = False
 
         header = bool(data.get('header'))

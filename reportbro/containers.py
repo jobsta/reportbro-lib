@@ -41,7 +41,10 @@ class Container(object):
                     # make sure element can be rendered multiple times (for header/footer)
                     elem.first_render_element = True
                     elem.rendering_complete = False
-                self.sorted_elements.append(elem)
+                # if page break is not printed we have to skip it during prepare because
+                # offset calculations between elements are affected
+                if not isinstance(elem, PageBreakElement) or elem.is_printed(ctx):
+                    self.sorted_elements.append(elem)
 
         if pdf_doc:
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.sort_order))
