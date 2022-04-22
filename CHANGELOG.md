@@ -1,9 +1,10 @@
 # Changelog
 
-## Upcoming Release
+## [2.1.0] - 2022-04-22
 
 ### Changes
 * Support "Print if" condition for page break
+* Support Average and Sum Parameter Type for table groups
 
 ### Bug Fixes
 * Fix rendering table inside section with same data source
