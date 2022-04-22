@@ -1,0 +1,28 @@
+name: Publish
+
+on:
+  create:
+    tags:
+      - v*
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Load cached $HOME/.local
+      uses: actions/cache@v3
+      with:
+        path: ~/.local
+        key: dotlocal-${{ runner.os }}-${{ hashFiles('.github/workflows/publish.yml') }}
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+    - name: Build and publish
+      run: |
+        poetry publish --build --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
