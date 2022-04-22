@@ -35,7 +35,7 @@ packages = [
 include = ["data/logo_watermark.png"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "~2.7 || ^3.5"
 Babel = "^2.9.1"
 reportbro-fpdf = "^1.7.11"
 reportbro-simpleeval = "^0.9.11"
