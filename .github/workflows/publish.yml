@@ -7,8 +7,17 @@ on:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      actions: read
+      checks: write
+      issues: read
+      packages: write
+      pull-requests: read
+      repository-projects: read
+      statuses: read
 
     steps:
     - uses: actions/checkout@v3
@@ -26,3 +35,9 @@ jobs:
     - name: Build and publish
       run: |
         poetry publish --build --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
+    - name: Upload Release Assets
+      uses: alexellis/upload-assets@0.3.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        asset_paths: '["dist/reportbro_lib-*.whl", "dist/reportbro-lib-*.tar.gz"]'
