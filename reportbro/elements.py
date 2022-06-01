@@ -1195,14 +1195,14 @@ class TableBandElement(object):
                 self.group_changed = True
                 # now set index range which is used for function parameters like sum/avg
                 if self.before_group:
-                    self.group_row_index_start = self.group_changed_row_indices.pop(0)
-                    if self.group_changed_row_indices:
-                        self.group_row_index_end = self.group_changed_row_indices[0]
+                    self.group_row_index_start = self.group_changed_row_indices[0]
+                    if len(self.group_changed_row_indices) > 1:
+                        self.group_row_index_end = self.group_changed_row_indices[1]
                     else:
                         self.group_row_index_end = -1
                 else:
                     self.group_row_index_start = self.group_row_index_end
-                    self.group_row_index_end = self.group_changed_row_indices.pop(0) + 1
+                    self.group_row_index_end = self.group_changed_row_indices[0] + 1
 
         if self.print_if:
             self.print_if_result = ctx.evaluate_expression(
@@ -1312,6 +1312,9 @@ class TableBandElement(object):
             else:
                 self.prepare_container = False
                 self.container.used_band_height = available_height
+
+        if self.rendering_complete and self.group_changed:
+            self.group_changed_row_indices.pop(0)
 
     def get_used_band_height(self):
         return self.container.used_band_height
