@@ -1,8 +1,10 @@
 # Changelog
 
-## Upcoming Release
+## [2.1.1] - 2022-06-13
+
 ### Bug Fixes
 * Fix rendering table group band on page break
+* Fix error when rendering empty table with table group band
 
 ## [2.1.0] - 2022-04-22
 
