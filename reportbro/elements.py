@@ -991,7 +991,7 @@ class TableElement(DocElement):
 
         :param ctx: current context
         """
-        if self.has_table_band_group:
+        if self.has_table_band_group and self.row_count > 0:
             row_index = 0
             content_group_rows = []
             for content_row in self.content_rows:
