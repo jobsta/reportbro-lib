@@ -721,7 +721,7 @@ class TableTextElement(TextElement):
                     simple_array_item_value = cell_values[self.simple_array_item_index]
                     return ctx.get_formatted_value(
                         simple_array_item_value, self.simple_array_param,
-                        object_id=None, is_array_item=True)
+                        object_id=self.id, field='content', is_array_item=True)
         return TextElement.fill_parameters(self, ctx)
 
     def is_printed(self, ctx):

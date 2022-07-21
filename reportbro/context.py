@@ -14,6 +14,12 @@ from .enums import *
 from .errors import Error, ReportBroError
 
 
+try:
+    basestring  # For Python 2, str and unicode
+except NameError:
+    basestring = str
+
+
 # parameter instance, the data map referenced by the parameter and the data map containing
 # the context_id (this is usually the data map but can be different for collection
 # parameters)
@@ -158,7 +164,8 @@ class Context:
                                   object_id=object_id, field=field, info=parameter_name))
 
                     if value is not None:
-                        rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+                        rv += self.get_formatted_value(
+                            value, param_ref.parameter, object_id, field=field, pattern=pattern)
                     parameter_index = -1
             prev_c = c
         return rv
@@ -240,13 +247,16 @@ class Context:
     def is_parameter_name(expr):
         return expr and expr.lstrip().startswith('${') and expr.rstrip().endswith('}')
 
-    def get_formatted_value(self, value, parameter, object_id, pattern=None, is_array_item=False):
+    def get_formatted_value(self, value, parameter, object_id, field, pattern=None, is_array_item=False):
         rv = ''
         if is_array_item and parameter.type == ParameterType.simple_array:
             value_type = parameter.array_item_type
         else:
             value_type = parameter.type
         if value_type == ParameterType.string:
+            if not isinstance(value, basestring):
+                raise ReportBroError(
+                    Error('errorMsgInvalidStringData', object_id=object_id, field=field, context=parameter.name))
             rv = value
         elif value_type in (ParameterType.number, ParameterType.average, ParameterType.sum):
             if pattern:
