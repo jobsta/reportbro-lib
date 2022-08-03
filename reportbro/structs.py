@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import division
 from .enums import *
 from .errors import Error
 from .utils import get_float_value, get_int_value
@@ -9,12 +7,20 @@ class Color:
     def __init__(self, color):
         self.color_code = ''
         if color:
-            assert len(color) == 7 and color[0] == '#'
-            self.r = int(color[1:3], 16)
-            self.g = int(color[3:5], 16)
-            self.b = int(color[5:7], 16)
-            self.transparent = False
-            self.color_code = color
+            valid = False
+            if isinstance(color, str) and len(color) == 7 and color[0] == '#':
+                try:
+                    self.r = int(color[1:3], 16)
+                    self.g = int(color[3:5], 16)
+                    self.b = int(color[5:7], 16)
+                    self.transparent = False
+                    self.color_code = color
+                    valid = True
+                except ValueError:
+                    pass
+
+            if not valid:
+                raise RuntimeError(f'Invalid color value {color}')
         else:
             self.r = 0
             self.g = 0

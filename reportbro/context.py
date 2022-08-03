@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
 from collections import namedtuple
@@ -12,12 +10,6 @@ import decimal
 
 from .enums import *
 from .errors import Error, ReportBroError
-
-
-try:
-    basestring  # For Python 2, str and unicode
-except NameError:
-    basestring = str
 
 
 # parameter instance, the data map referenced by the parameter and the data map containing
@@ -254,7 +246,7 @@ class Context:
         else:
             value_type = parameter.type
         if value_type == ParameterType.string:
-            if not isinstance(value, basestring):
+            if not isinstance(value, str):
                 raise ReportBroError(
                     Error('errorMsgInvalidStringData', object_id=object_id, field=field, context=parameter.name))
             rv = value

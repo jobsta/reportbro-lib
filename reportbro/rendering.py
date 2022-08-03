@@ -1,4 +1,3 @@
-from __future__ import division
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError

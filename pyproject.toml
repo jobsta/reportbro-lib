@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "reportbro-lib"
-version = "2.1.1"
+version = "3.0.0"
 description = "Generate PDF and Excel reports from visually designed templates"
 authors = ["jobsta <alex@reportbro.com>"]
 license = "AGPL-3.0"
@@ -17,11 +17,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: GNU Affero General Public License v3",
-    "Programming Language :: Python :: 2",
-    "Programming Language :: Python :: 2.7",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.5",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -35,15 +31,13 @@ packages = [
 include = ["data/logo_watermark.png"]
 
 [tool.poetry.dependencies]
-python = "~2.7 || ^3.5"
-Babel = "^2.9.1"
+python = "^3.7"
+Babel = "^2.10.2"
 reportbro-fpdf = "^1.7.11"
 reportbro-simpleeval = "^0.9.11"
-Pillow = ">=4.0"
+Pillow = "^9.2.0"
 qrcode = "^7.3.1"
-XlsxWriter = "^3.0.2"
-enum34 = { version = "^1.1.10", python = "<3.4" }
-typing = { version = "^3.10.0", python = "<3.5" }
+XlsxWriter = "^3.0.3"
 
 [tool.poetry.dev-dependencies]
 

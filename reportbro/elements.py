@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import division
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
 from io import BytesIO
@@ -9,6 +7,7 @@ import decimal
 import PIL
 import qrcode
 import tempfile
+import urllib
 
 from .barcode128 import code128_image
 from .context import Context
@@ -18,17 +17,7 @@ from .errors import Error, ReportBroError
 from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
 from .structs import Color, BorderStyle, TextStyle
-from .utils import get_float_value, get_int_value, get_str_value, to_string, PY2, get_image_display_size
-
-if PY2:
-    import urllib2
-else:
-    import urllib
-
-try:
-    basestring  # For Python 2, str and unicode
-except NameError:
-    basestring = str
+from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
 
 
 class ImageElement(DocElement):
@@ -817,8 +806,6 @@ class TableElement(DocElement):
             # -> the free space is shared among the growable columns depending on
             # their grow weight
             if free_space > 0 and total_weight > 0:
-                # convert to float so division result is also float in Python 2
-                total_weight = float(total_weight)
                 for column_idx, cell in enumerate(self.header.cells):
                     if cell.grow_weight > 0:
                         added_width = int((free_space / total_weight) * cell.grow_weight + 0.5)

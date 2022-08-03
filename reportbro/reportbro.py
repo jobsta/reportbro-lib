@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017-2020 jobsta
+# Copyright (C) 2017-2022 jobsta
 #
 # This file is part of ReportBro, a library to generate PDF and Excel reports.
 # Demos can be found at https://www.reportbro.com
@@ -14,30 +14,20 @@
 # https://www.reportbro.com/license/agreement
 #
 
-from __future__ import unicode_literals
-from __future__ import division
 import base64
 import fpdf
 import re
 import xlsxwriter
 import pkg_resources
-from io import BytesIO, BufferedReader
+from io import BufferedReader
 import os
 
 from .containers import ReportBand
 from .elements import *
 from .enums import *
 from .structs import Parameter, TextStyle
-from .utils import get_int_value, parse_datetime_string, PY3
+from .utils import get_int_value, parse_datetime_string
 
-
-try:
-    basestring  # For Python 2, str and unicode
-except NameError:
-    basestring = str
-
-if PY3:
-    long = int
 
 regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
 
@@ -309,12 +299,11 @@ class ImageData:
                         # file object (only possible if report data is passed directly from python code
                         # and not via web request)
                         img_data, _ = ctx.get_parameter_data(param_ref)
-                        if isinstance(img_data, BufferedReader) or\
-                                (PY2 and isinstance(img_data, file)):
+                        if isinstance(img_data, BufferedReader):
                             self.image_fp = img_data
                             pos = img_data.name.rfind('.')
                             self.image_type = img_data.name[pos+1:].lower() if pos != -1 else ''
-                        elif isinstance(img_data, basestring):
+                        elif isinstance(img_data, str):
                             img_data_b64 = img_data
                     else:
                         raise ReportBroError(
@@ -341,10 +330,7 @@ class ImageData:
             if image_uri.startswith("http://") or image_uri.startswith("https://"):
                 image_url = image_uri
                 try:
-                    if PY2:
-                        parse_result = urllib2.urlparse.urlparse(image_url)
-                    else:
-                        parse_result = urllib.parse.urlparse(image_url)
+                    parse_result = urllib.parse.urlparse(image_url)
                     pos = parse_result.path.rfind('.')
                     self.image_type = parse_result.path[pos+1:].lower() if pos != -1 else ''
                 except ValueError as ex:
@@ -367,12 +353,8 @@ class ImageData:
 
         if image_url:
             try:
-                if PY2:
-                    req = urllib2.Request(image_url, headers=headers)
-                    self.image_fp = BytesIO(urllib2.urlopen(req).read())
-                else:
-                    req = urllib.request.Request(image_url, headers=headers)
-                    self.image_fp = BytesIO(urllib.request.urlopen(req).read())
+                req = urllib.request.Request(image_url, headers=headers)
+                self.image_fp = BytesIO(urllib.request.urlopen(req).read())
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
@@ -653,15 +635,14 @@ class Report:
         error_field = 'test_data' if is_test_data else 'type'
         if parameter_type == ParameterType.string:
             if value is not None:
-                if not isinstance(value, basestring):
-                    raise RuntimeError('value of parameter {name} must be str type (unicode for Python 2.7.x)'.
-                            format(name=parameter.name))
+                if not isinstance(value, str):
+                    raise RuntimeError('value of parameter {name} must be str type'.format(name=parameter.name))
             elif not parameter.nullable:
                 value = ''
 
         elif parameter_type == ParameterType.number:
             if value:
-                if isinstance(value, basestring):
+                if isinstance(value, str):
                     value = value.replace(',', '.')
                 try:
                     value = decimal.Decimal(str(value))
@@ -673,9 +654,9 @@ class Report:
                         self.errors.append(Error('errorMsgInvalidNumber',
                                                  object_id=parameter.id, field=error_field, context=parameter.name))
             elif value is not None:
-                if isinstance(value, (int, long, float)):
+                if isinstance(value, (int, float)):
                     value = decimal.Decimal(0)
-                elif is_test_data and isinstance(value, basestring):
+                elif is_test_data and isinstance(value, str):
                     value = None if parameter.nullable else decimal.Decimal(0)
                 elif not isinstance(value, decimal.Decimal):
                     if parent_id and is_test_data:
@@ -694,7 +675,7 @@ class Report:
                 value = False
 
         elif parameter_type == ParameterType.date:
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 if is_test_data and not value:
                     value = None if parameter.nullable else datetime.datetime.now()
                 else:
@@ -845,19 +826,19 @@ class Report:
                 parameter.expression, parameter.id, field='expression')
             valid_value = False
             if parameter_type == ParameterType.string:
-                if isinstance(value, basestring):
+                if isinstance(value, str):
                     valid_value = True
             elif parameter_type == ParameterType.number:
                 if isinstance(value, decimal.Decimal):
                     valid_value = True
-                elif isinstance(value, (int, long, float)):
+                elif isinstance(value, (int, float)):
                     value = decimal.Decimal(value)
                     valid_value = True
             elif parameter_type == ParameterType.boolean:
                 if isinstance(value, bool):
                     valid_value = True
             elif parameter_type == ParameterType.date:
-                if isinstance(value, basestring):
+                if isinstance(value, str):
                     try:
                         value = parse_datetime_string(value)
                     except (ValueError, TypeError):
