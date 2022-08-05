@@ -56,16 +56,32 @@ class Context:
         """
         if name.find('.') != -1:
             # this parameter is part of a collection, so we first get the reference to the
-            # collection parameter and then return the parameter inside the collection
+            # collection parameter and then return the parameter inside the collection, there can
+            # also be multiple nested levels of collections where each collection is referenced
+            # by a dot, e.g. "coll1.coll2.field"
             name_parts = name.split('.')
             collection_name = name_parts[0]
-            field_name = name_parts[1]
             param_ref = self._get_parameter(collection_name)
             if param_ref is not None and param_ref.parameter.type == ParameterType.map and\
-                    field_name in param_ref.parameter.fields and collection_name in param_ref.data:
-                return ParameterRef(
-                    parameter=param_ref.parameter.fields[field_name],
-                    data=param_ref.data[collection_name], data_context=param_ref.data)
+                    collection_name in param_ref.data:
+                parameter = param_ref.parameter
+                data = param_ref.data
+                while True:
+                    collection_name = name_parts[0]
+                    field_name = name_parts[1]
+                    name_parts = name_parts[1:]
+                    if len(name_parts) <= 1:
+                        break
+                    # nested map
+                    if field_name in parameter.fields and collection_name in data:
+                        parameter = parameter.fields[field_name]
+                        data = data[collection_name]
+                    else:
+                        return None
+
+                if field_name in parameter.fields and collection_name in data:
+                    return ParameterRef(
+                        parameter=parameter.fields[field_name], data=data[collection_name], data_context=data)
             return None
         else:
             return self._get_parameter(name)
