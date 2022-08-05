@@ -13,7 +13,7 @@ from .barcode128 import code128_image
 from .context import Context
 from .docelement import DocElementBase, DocElement
 from .enums import *
-from .errors import Error, ReportBroError
+from .errors import Error, ReportBroError, ReportBroInternalError
 from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
 from .structs import Color, BorderStyle, TextStyle
@@ -205,12 +205,12 @@ class TextElement(DocElement):
         self.rich_text = bool(data.get('richText'))
         self.rich_text_content = data.get('richTextContent') or {}
         if self.rich_text and not isinstance(self.rich_text_content, dict):
-            raise RuntimeError('Invalid richTextContent for text element {id}'.format(id=self.id))
+            raise ReportBroInternalError(f'Invalid richTextContent for text element {self.id}')
         self.eval = bool(data.get('eval'))
         if data.get('styleId'):
             style = report.styles.get(get_int_value(data, 'styleId'))
             if style is None:
-                raise RuntimeError('Style for text element {id} not found'.format(id=self.id))
+                raise ReportBroInternalError(f'Style for text element {self.id} not found')
             # shallow copy is sufficient in our case
             self.style = copy.copy(style)
         else:
@@ -223,7 +223,7 @@ class TextElement(DocElement):
             if data.get('cs_styleId'):
                 style = report.styles.get(int(data.get('cs_styleId')))
                 if style is None:
-                    raise RuntimeError('Conditional style for text element {id} not found'.format(id=self.id))
+                    raise ReportBroInternalError(f'Conditional style for text element {self.id} not found')
                 # shallow copy is sufficient in our case
                 self.conditional_style = copy.copy(style)
             else:

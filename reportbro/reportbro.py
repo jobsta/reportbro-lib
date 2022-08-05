@@ -25,6 +25,7 @@ import os
 from .containers import ReportBand
 from .elements import *
 from .enums import *
+from .errors import Error, ReportBroError, ReportBroInternalError
 from .structs import Parameter, TextStyle
 from .utils import get_int_value, parse_datetime_string
 
@@ -82,7 +83,7 @@ class DocumentPDFRenderer:
                 break
             page_count += 1
             if self.page_limit and page_count > self.page_limit:
-                raise RuntimeError('Too many pages (probably an endless loop)')
+                raise ReportBroInternalError('Too many pages (probably an endless loop)', log_error=False)
         self.context.set_page_count(page_count)
 
         footer_offset_y = self.document_properties.page_height -\
@@ -258,7 +259,7 @@ class DocumentProperties:
         self.pattern_locale = data.get('patternLocale', '')
         self.pattern_currency_symbol = data.get('patternCurrencySymbol', '')
         if self.pattern_locale not in ('de', 'en', 'es', 'fr', 'it'):
-            raise RuntimeError('invalid pattern_locale')
+            raise ReportBroInternalError('invalid pattern_locale', log_error=False)
 
         self.header = bool(data.get('header'))
         if self.header:
@@ -637,7 +638,8 @@ class Report:
         if parameter_type == ParameterType.string:
             if value is not None:
                 if not isinstance(value, str):
-                    raise RuntimeError('value of parameter {name} must be str type'.format(name=parameter.name))
+                    raise ReportBroInternalError(
+                        f'value of parameter {parameter.name} must be str type', log_error=False)
             elif not parameter.nullable:
                 value = ''
 

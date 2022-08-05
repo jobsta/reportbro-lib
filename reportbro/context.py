@@ -9,7 +9,7 @@ import datetime
 import decimal
 
 from .enums import *
-from .errors import Error, ReportBroError
+from .errors import Error, ReportBroError, ReportBroInternalError
 
 
 # parameter instance, the data map referenced by the parameter and the data map containing
@@ -140,7 +140,7 @@ class Context:
 
     def pop_context(self):
         if len(self.context_stack) <= 1:
-            raise RuntimeError('Context.pop_context failed')
+            raise ReportBroInternalError('Context.pop_context failed')
         self.context_stack = self.context_stack[:-1]
 
     def fill_parameters(self, expr, object_id, field, pattern=None):
@@ -264,7 +264,7 @@ class Context:
             if not isinstance(value, str):
                 # this should not be possible because parameter types are already
                 # validated in Report.parse_parameter_value
-                raise RuntimeError('value of parameter {name} must be str type'.format(name=parameter.name))
+                raise ReportBroInternalError(f'value of parameter {parameter.name} must be str type')
             rv = value
         elif value_type in (ParameterType.number, ParameterType.average, ParameterType.sum):
             if pattern:

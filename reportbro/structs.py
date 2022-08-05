@@ -1,5 +1,5 @@
 from .enums import *
-from .errors import Error
+from .errors import Error, ReportBroInternalError
 from .utils import get_float_value, get_int_value
 
 
@@ -20,7 +20,7 @@ class Color:
                     pass
 
             if not valid:
-                raise RuntimeError(f'Invalid color value {color}')
+                raise ReportBroInternalError(f'Invalid color value {color}', log_error=False)
         else:
             self.r = 0
             self.g = 0
