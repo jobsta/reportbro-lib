@@ -618,8 +618,9 @@ class Report:
         return renderer.render()
 
     def generate_xlsx(self, filename=''):
-        renderer = DocumentXLSXRenderer(header_band=self.header, content_band=self.content, footer_band=self.footer,
-                report=self, context=self.context, filename=filename)
+        renderer = DocumentXLSXRenderer(
+            header_band=self.header, content_band=self.content, footer_band=self.footer,
+            report=self, context=self.context, filename=filename)
         return renderer.render()
 
     # goes through all elements in header, content and footer and throws a ReportBroError in case
@@ -717,6 +718,23 @@ class Report:
                 if parameter_type in (ParameterType.string, ParameterType.number,
                                       ParameterType.boolean, ParameterType.date):
                     value = self.parse_parameter_value(parameter, parent_id, is_test_data, parameter_type, value)
+                    dest_data[parameter.name] = value
+                elif parameter_type == ParameterType.simple_array:
+                    if isinstance(value, list):
+                        list_values = []
+                        for list_value in value:
+                            parsed_value = self.parse_parameter_value(
+                                parameter, parent_id, is_test_data, parameter.array_item_type, list_value)
+                            list_values.append(parsed_value)
+                        dest_data[parameter.name] = list_values
+                    elif value is None:
+                        if not parameter.nullable:
+                            value = []
+                        dest_data[parameter.name] = value
+                    else:
+                        self.errors.append(Error(
+                            'errorMsgInvalidArray',
+                            object_id=parameter.id, field=field, context=parameter.name))
                 elif not parents:
                     if parameter_type == ParameterType.array:
                         if isinstance(value, list):
@@ -734,32 +752,16 @@ class Report:
                                 dest_array_item['row_number'] = row_number
                                 dest_array.append(dest_array_item)
                             parents = parents[:-1]
-                            value = dest_array
+                            dest_data[parameter.name] = dest_array
                         elif value is None:
                             if not parameter.nullable:
                                 value = []
-                        else:
-                            self.errors.append(Error(
-                                'errorMsgInvalidArray',
-                                object_id=parameter.id, field=field, context=parameter.name))
-                    elif parameter_type == ParameterType.simple_array:
-                        if isinstance(value, list):
-                            list_values = []
-                            for list_value in value:
-                                parsed_value = self.parse_parameter_value(
-                                    parameter, parent_id, is_test_data, parameter.array_item_type, list_value)
-                                list_values.append(parsed_value)
-                            value = list_values
-                        elif value is None:
-                            if not parameter.nullable:
-                                value = []
+                            dest_data[parameter.name] = value
                         else:
                             self.errors.append(Error(
                                 'errorMsgInvalidArray',
                                 object_id=parameter.id, field=field, context=parameter.name))
                     elif parameter_type == ParameterType.map:
-                        if value is None and not parameter.nullable:
-                            value = dict()
                         if isinstance(value, dict):
                             if isinstance(parameter.children, list):
                                 parents.append(parameter)
@@ -770,16 +772,24 @@ class Report:
                                     dest_data=dest_map, src_data=value, parameters=parameter.children,
                                     is_test_data=is_test_data, parents=parents)
                                 parents = parents[:-1]
-                                value = dest_map
+                                dest_data[parameter.name] = dest_map
                             else:
                                 self.errors.append(Error(
                                     'errorMsgInvalidMap',
                                     object_id=parameter.id, field='type', context=parameter.name))
+                        elif value is None:
+                            if not parameter.nullable:
+                                value = dict()
+                            dest_data[parameter.name] = value
                         else:
                             self.errors.append(Error(
-                                'errorMsgMissingData',
-                                object_id=parameter.id, field='name', context=parameter.name))
-                dest_data[parameter.name] = value
+                                'errorMsgInvalidMap',
+                                object_id=parameter.id, field='type', context=parameter.name))
+                else:
+                    # nested parameters (array / map inside other array / map parameter) are only
+                    # supported in PLUS version
+                    self.errors.append(Error(
+                        'errorMsgPlusVersionRequired', object_id=parameter.id, field='type', context=parameter.name))
 
     def evaluate_parameters(self, parameters, data):
         for parameter in parameters:
