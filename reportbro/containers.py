@@ -20,11 +20,13 @@ class Container(object):
         self.render_elements_created = False
         self.manual_page_break = False
         self.first_element_offset_y = 0
-        # in case not all elements could be rendered on the same page, the next element will start
-        # at the top of the next page independent of the actual distance to its predecessor. the
-        # skipped height is the difference to the predecessor which gets "lost" because of the new page
-        self.skipped_height = 0
-        self.used_band_height = 0
+        # maximum bottom value (from element layout coordinates) of currently rendered elements,
+        # this is used the determine if the minimum height of a container
+        # (e.g. table or section band) is reached
+        self.max_bottom = 0
+        # maximum bottom render value of currently rendered elements, this is the actual container
+        # height on the current page
+        self.render_bottom = 0
 
     def add(self, doc_element):
         self.doc_elements.append(doc_element)
@@ -58,21 +60,14 @@ class Container(object):
                     if elem.is_predecessor(elem2):
                         elem.add_predecessor(elem2)
             self.render_elements = []
-            self.used_band_height = 0
+            self.render_bottom = 0
             self.first_element_offset_y = 0
         else:
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.x))
 
     def clear_rendered_elements(self):
         self.render_elements = []
-        self.used_band_height = 0
-
-    def get_render_elements_bottom(self):
-        bottom = 0
-        for render_element in self.render_elements:
-            if render_element.render_bottom > bottom:
-                bottom = render_element.render_bottom
-        return bottom
+        self.render_bottom = 0
 
     def create_render_elements(self, container_top, container_height, ctx, pdf_doc):
         i = 0
@@ -115,9 +110,6 @@ class Container(object):
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
-                            # add to "lost" height of container because next element is printed at top
-                            # of next page instead of actual offset
-                            self.skipped_height += offset_y - container_height
                             new_page = True
                         if not new_page:
                             render_elem, complete = elem.get_next_render_element(
@@ -128,8 +120,10 @@ class Container(object):
                             if render_elem:
                                 self.render_elements.append(render_elem)
                                 self.render_elements_created = True
-                                if render_elem.render_bottom > self.used_band_height:
-                                    self.used_band_height = render_elem.render_bottom
+                                if elem.bottom > self.max_bottom:
+                                    self.max_bottom = elem.bottom
+                                if render_elem.render_bottom > self.render_bottom:
+                                    self.render_bottom = render_elem.render_bottom
                     else:
                         processed_elements.append(elem)
                         elem.finish_empty_element(offset_y)
@@ -212,8 +206,8 @@ class Container(object):
         """
         self.manual_page_break = False
         self.first_element_offset_y = 0
-        self.skipped_height = 0
-        self.used_band_height = 0
+        self.max_bottom = 0
+        self.render_bottom = 0
         for elem in self.doc_elements:
             elem.first_render_element = True
             elem.rendering_complete = False

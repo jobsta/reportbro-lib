@@ -115,7 +115,7 @@ class TableRenderElement(DocElementBase):
 
     def add_band(self, band, row_index=-1):
         if band.rendering_complete or not band.always_print_on_same_page:
-            band_height = band.get_used_band_height()
+            band_height = band.get_render_bottom()
             background_color = band.background_color
             if band.band_type == BandType.content and not band.alternate_background_color.transparent and\
                     row_index % 2 == 1:
@@ -285,7 +285,7 @@ class SectionRenderElement(DocElementBase):
 
     def add_section_band(self, section_band):
         if section_band.rendering_complete or not section_band.always_print_on_same_page:
-            band_height = section_band.get_used_band_height()
+            band_height = section_band.get_render_bottom()
             self.bands.append(dict(height=band_height, elements=list(section_band.get_render_elements())))
             self.height += band_height
             self.render_bottom += band_height

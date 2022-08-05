@@ -1121,7 +1121,6 @@ class TableBandElement(object):
         self.container.allow_page_break = False
         self.rendering_complete = False
         self.prepare_container = True
-        self.rendered_band_height = 0
 
     def set_printed_cells(self, ctx):
         """Initialize the printed cells.
@@ -1251,7 +1250,6 @@ class TableBandElement(object):
         else:
             if self.prepare_container:
                 self.container.prepare(ctx, pdf_doc)
-                self.rendered_band_height = 0
 
                 heights = [self.height]
                 # get max height of all cells of this band
@@ -1264,7 +1262,6 @@ class TableBandElement(object):
                     if isinstance(cell, TableTextElement):
                         cell.set_height(max_height)
             else:
-                self.rendered_band_height += self.container.used_band_height
                 # clear render elements from previous page
                 self.container.clear_rendered_elements()
 
@@ -1272,19 +1269,18 @@ class TableBandElement(object):
                 container_top + offset_y, available_height, ctx=ctx, pdf_doc=pdf_doc)
 
         if self.rendering_complete:
-            remaining_min_height = self.height - self.rendered_band_height
-            if self.container.used_band_height < remaining_min_height:
+            remaining_min_height = self.height - self.container.max_bottom
+            if remaining_min_height > 0:
                 # rendering of band complete, make sure band is at least as large
                 # as minimum height (even if it spans over more than 1 page)
                 if remaining_min_height <= available_height:
                     self.prepare_container = True
-                    # TODO: check
-                    self.container.used_band_height = remaining_min_height
+                    self.container.render_bottom += remaining_min_height
                 else:
                     # minimum height is larger than available space, continue on next page
                     self.rendering_complete = False
                     self.prepare_container = False
-                    self.container.used_band_height = available_height
+                    self.container.render_bottom += available_height
             else:
                 self.prepare_container = True
         else:
@@ -1298,13 +1294,12 @@ class TableBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-                self.container.used_band_height = available_height
 
         if self.rendering_complete and self.group_changed:
             self.group_changed_row_indices.pop(0)
 
-    def get_used_band_height(self):
-        return self.container.used_band_height
+    def get_render_bottom(self):
+        return self.container.render_bottom
 
     def get_render_elements(self):
         return self.container.render_elements
@@ -1333,8 +1328,8 @@ class FrameElement(DocElement):
             width=self.width, height=self.height,
             container_id=str(data.get('linkedContainerId')), containers=containers, report=report)
 
-    def get_used_height(self):
-        height = self.container.get_render_elements_bottom()
+    def get_render_bottom(self):
+        height = self.container.render_bottom
         if self.border_style.border_top and self.render_element_type == RenderElementType.none:
             height += self.border_style.border_width
         if self.border_style.border_bottom:
@@ -1351,6 +1346,7 @@ class FrameElement(DocElement):
 
     def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
         self.render_y = offset_y
+        available_height = container_height - offset_y
         content_height = container_height
         render_element = FrameRenderElement(self.report, self, render_y=offset_y)
 
@@ -1364,12 +1360,11 @@ class FrameElement(DocElement):
             content_height -= self.border_style.border_width
 
         if self.first_render_element:
-            available_height = container_height - offset_y
             self.first_render_element = False
             rendering_complete = self.container.create_render_elements(
                 container_top + offset_y, content_height, ctx, pdf_doc)
 
-            needed_height = self.get_used_height()
+            needed_height = self.get_render_bottom()
 
             if rendering_complete and needed_height <= available_height:
                 # rendering is complete and all elements of frame fit on current page
@@ -1413,7 +1408,7 @@ class FrameElement(DocElement):
         else:
             self.rendering_complete = self.container.create_render_elements(
                 container_top, content_height, ctx, pdf_doc)
-        self.render_bottom = offset_y + self.get_used_height()
+        self.render_bottom = offset_y + self.get_render_bottom()
 
         if not self.rendering_complete:
             # use whole size of container if frame is not rendered completely
@@ -1428,7 +1423,7 @@ class FrameElement(DocElement):
                 self.render_element_type = RenderElementType.complete
             else:
                 self.render_element_type = RenderElementType.last
-        render_element.add_elements(self.container, self.render_element_type, self.get_used_height())
+        render_element.add_elements(self.container, self.render_element_type, self.get_render_bottom())
         return render_element, self.rendering_complete
 
     def render_spreadsheet(self, row, col, ctx, renderer):
@@ -1465,23 +1460,19 @@ class SectionBandElement(object):
             self.container.allow_page_break = False
         self.rendering_complete = False
         self.prepare_container = True
-        self.rendered_band_height = 0
 
     def prepare(self, ctx, pdf_doc, only_verify):
         pass
 
     def create_render_elements(self, offset_y, container_top, container_height, ctx, pdf_doc):
         available_height = container_height - offset_y
-        if self.always_print_on_same_page and not self.shrink_to_content_height and\
-                available_height < self.height:
+        if self.always_print_on_same_page and not self.shrink_to_content_height and available_height < self.height:
             # not enough space for whole band
             self.rendering_complete = False
         else:
             if self.prepare_container:
                 self.container.prepare(ctx, pdf_doc)
-                self.rendered_band_height = 0
             else:
-                self.rendered_band_height += self.container.used_band_height
                 # clear render elements from previous page
                 self.container.clear_rendered_elements()
             self.rendering_complete = self.container.create_render_elements(
@@ -1493,18 +1484,18 @@ class SectionBandElement(object):
                     Error('errorMsgSectionBandPageBreakNotAllowed', object_id=self.id, field='alwaysPrintOnSamePage'))
 
         if self.rendering_complete:
-            remaining_min_height = self.height - self.rendered_band_height - self.container.skipped_height
-            if not self.shrink_to_content_height and self.container.used_band_height < remaining_min_height:
+            remaining_min_height = self.height - self.container.max_bottom
+            if not self.shrink_to_content_height and remaining_min_height > 0:
                 # rendering of band complete, make sure band is at least as large
                 # as minimum height (even if it spans over more than 1 page)
                 if remaining_min_height <= available_height:
                     self.prepare_container = True
-                    self.container.used_band_height = remaining_min_height
+                    self.container.render_bottom += remaining_min_height
                 else:
                     # minimum height is larger than available space, continue on next page
                     self.rendering_complete = False
                     self.prepare_container = False
-                    self.container.used_band_height = available_height
+                    self.container.render_bottom += available_height
             else:
                 self.prepare_container = True
         else:
@@ -1518,17 +1509,9 @@ class SectionBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-                if self.container.manual_page_break:
-                    # in case of manual page break the used band height
-                    # is the position of the page break element
-                    self.container.used_band_height = self.container.first_element_offset_y
-                else:
-                    # in case the available height was not sufficient the used band height
-                    # is the total available height
-                    self.container.used_band_height = available_height
 
-    def get_used_band_height(self):
-        return self.container.used_band_height
+    def get_render_bottom(self):
+        return self.container.render_bottom
 
     def get_render_elements(self):
         return self.container.render_elements
