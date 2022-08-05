@@ -709,8 +709,7 @@ class TableTextElement(TextElement):
                 if value_exists and self.simple_array_item_index < len(cell_values):
                     simple_array_item_value = cell_values[self.simple_array_item_index]
                     return ctx.get_formatted_value(
-                        simple_array_item_value, self.simple_array_param,
-                        object_id=self.id, field='content', is_array_item=True)
+                        simple_array_item_value, self.simple_array_param, object_id=self.id, is_array_item=True)
         return TextElement.fill_parameters(self, ctx)
 
     def is_printed(self, ctx):
