@@ -33,7 +33,7 @@ include = ["data/logo_watermark.png"]
 [tool.poetry.dependencies]
 python = "^3.7"
 Babel = "^2.10.2"
-reportbro-fpdf = "^1.7.11"
+reportbro-fpdf2 = "^0.9.1"
 reportbro-simpleeval = "^0.9.11"
 Pillow = "^9.2.0"
 qrcode = "^7.3.1"

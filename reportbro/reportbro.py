@@ -19,7 +19,7 @@ import fpdf
 import re
 import xlsxwriter
 import pkg_resources
-from io import BufferedReader
+from io import BufferedReader, IOBase
 import os
 
 from .containers import ReportBand
@@ -282,7 +282,7 @@ class DocumentProperties:
 
 class ImageData:
     def __init__(self, ctx, image_id, source, image_file, is_test_data, headers):
-        self.image_fp = None
+        self.image_data = None
         self.image_type = None
         image_uri = None  # can be either url or file path
         image_url = None
@@ -301,7 +301,7 @@ class ImageData:
                         # and not via web request)
                         img_data, _ = ctx.get_parameter_data(param_ref)
                         if isinstance(img_data, BufferedReader):
-                            self.image_fp = img_data
+                            self.image_data = img_data
                             pos = img_data.name.rfind('.')
                             self.image_type = img_data.name[pos+1:].lower() if pos != -1 else ''
                         elif isinstance(img_data, str):
@@ -315,7 +315,7 @@ class ImageData:
             else:
                 image_uri = source
 
-        if img_data_b64 is None and not image_uri and self.image_fp is None and image_file:
+        if img_data_b64 is None and not image_uri and self.image_data is None and image_file:
             # static image base64 encoded within image element
             img_data_b64 = image_file
 
@@ -326,7 +326,7 @@ class ImageData:
                     Error('errorMsgInvalidImage', object_id=image_id, field='source'))
             self.image_type = m.group(1).lower()
             img_data = base64.b64decode(re.sub('^data:image/.+;base64,', '', img_data_b64))
-            self.image_fp = BytesIO(img_data)
+            self.image_data = BytesIO(img_data)
         elif image_uri:
             if image_uri.startswith("http://") or image_uri.startswith("https://"):
                 image_url = image_uri
@@ -355,7 +355,7 @@ class ImageData:
         if image_url:
             try:
                 req = urllib.request.Request(image_url, headers=headers)
-                self.image_fp = BytesIO(urllib.request.urlopen(req).read())
+                self.image_data = BytesIO(urllib.request.urlopen(req).read())
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
@@ -366,7 +366,7 @@ class ImageData:
                 # make sure image file access is restricted to application
                 if os.path.commonprefix([cwd, image_path]) != cwd:
                     raise Exception('Accessing file outside of application path not allowed')
-                self.image_fp = open(image_path, 'rb')
+                self.image_data = open(image_path, 'rb')
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
@@ -383,8 +383,8 @@ class FPDFRB(fpdf.FPDF):
         fpdf.FPDF.__init__(self, orientation=orientation, unit='pt', format=dimension)
         self.x = 0
         self.y = 0
-        self.set_doc_option('core_fonts_encoding', core_fonts_encoding)
-        self.set_doc_option('encode_error_handling', encode_error_handling)
+        self.core_fonts_encoding = core_fonts_encoding
+        self.encode_error_handling = encode_error_handling
         self.loaded_images = dict()
         self.available_fonts = dict(
             courier=dict(standard_font=True),

@@ -82,7 +82,7 @@ class ImageElement(DocElement):
                 col = self.spreadsheet_column - 1
 
             try:
-                raw_image = PIL.Image.open(image.image_fp)
+                raw_image = PIL.Image.open(image.image_data)
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=self.id,
@@ -93,10 +93,10 @@ class ImageElement(DocElement):
             if image_display_width != raw_image.width or image_display_height != raw_image.height:
                 raw_image = raw_image.resize(
                     (int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
-                image.image_fp = BytesIO()
-                raw_image.save(image.image_fp, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
+                image.image_data = BytesIO()
+                raw_image.save(image.image_data, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
 
-            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_fp,
+            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_data,
                                   width=self.width, url=self.prepared_link)
             row += 2 if self.spreadsheet_add_empty_row else 1
             col += 1

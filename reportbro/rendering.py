@@ -30,7 +30,7 @@ class ImageRenderElement(DocElementBase):
             pdf_doc.rect(x, y, self.width, self.height, 'F')
         if self.image_key:
             image = self.report.get_image(self.image_key)
-            if image and image.image_fp:
+            if image and image.image_data:
                 halign = {
                     HorizontalAlignment.left: 'L', HorizontalAlignment.center: 'C',
                     HorizontalAlignment.right: 'R'}.get(self.horizontal_alignment)
@@ -39,8 +39,7 @@ class ImageRenderElement(DocElementBase):
                     VerticalAlignment.bottom: 'B'}.get(self.vertical_alignment)
                 try:
                     image_info = pdf_doc.image(
-                        self.image_key, x, y, self.width, self.height, type=image.image_type,
-                        image_fp=image.image_fp, halign=halign, valign=valign)
+                        image.image_data, x, y, self.width, self.height, halign=halign, valign=valign)
                 except Exception as ex:
                     raise ReportBroError(
                         Error('errorMsgLoadingImageFailed', object_id=self.id,
