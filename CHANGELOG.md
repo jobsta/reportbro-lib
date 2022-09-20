@@ -1,5 +1,14 @@
 # Changelog
 
+## Upcoming Release
+
+### Features
+* Support processing of nested parameters and rendering nested sections (PLUS version)
+
+### Changes
+* Drop support for old Python versions 2.x and < 3.7
+* Switch to maintained fpdf2 lib for pdf rendering
+
 ## [2.1.1] - 2022-06-13
 
 ### Bug Fixes
