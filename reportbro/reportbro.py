@@ -16,11 +16,11 @@
 
 import base64
 import fpdf
+import importlib.resources
 import re
-import xlsxwriter
-import pkg_resources
-from io import BufferedReader, IOBase
 import os
+import xlsxwriter
+from io import BufferedReader, IOBase
 
 from .containers import ReportBand
 from .elements import *
@@ -59,13 +59,15 @@ class DocumentPDFRenderer:
 
     def render(self):
         watermark_width = watermark_height = 0
-        watermark_filename = pkg_resources.resource_filename('reportbro', 'data/logo_watermark.png')
+        watermark_filename = None
         if self.add_watermark:
-            if not os.path.exists(watermark_filename):
-                self.add_watermark = False
-            else:
-                watermark_width = self.document_properties.page_width / 3
-                watermark_height = watermark_width * (115 / 460)
+            with importlib.resources.path('reportbro.data', 'logo_watermark.png') as p:
+                watermark_filename = p
+                if watermark_filename.exists():
+                    watermark_width = self.document_properties.page_width / 3
+                    watermark_height = watermark_width * (115 / 460)
+                else:
+                    self.add_watermark = False
 
         self.content_band.prepare(self.context, self.pdf_doc)
         page_count = 1
