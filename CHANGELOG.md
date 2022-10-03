@@ -4,6 +4,7 @@
 
 ### Features
 * Support processing of nested parameters and rendering nested sections (PLUS version)
+* Support option to set bar width for code128 barcode
 
 ### Changes
 * Drop support for old Python versions 2.x and < 3.7
