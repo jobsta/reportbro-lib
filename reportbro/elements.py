@@ -110,6 +110,7 @@ class BarCodeElement(DocElement):
         self.format = get_str_value(data, 'format').lower()
         assert self.format in ('code128', 'qrcode')
         self.display_value = bool(data.get('displayValue')) if self.format == 'code128' else False
+        self.bar_width = get_float_value(data, 'barWidth')
         error_correction_level = get_str_value(data, 'errorCorrectionLevel')
         self.error_correction_level = qrcode.ERROR_CORRECT_M
         if error_correction_level == 'L':
@@ -141,7 +142,8 @@ class BarCodeElement(DocElement):
                 if self.format == 'qrcode':
                     img = qrcode.make(self.prepared_content, border=0, error_correction=self.error_correction_level)
                 elif self.format == 'code128':
-                    img = code128_image(self.prepared_content, height=self.image_height, thickness=2, quiet_zone=False)
+                    img = code128_image(
+                        self.prepared_content, height=self.image_height, thickness=self.bar_width, quiet_zone=False)
             except:
                 raise ReportBroError(
                     Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))

@@ -13,12 +13,13 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE
 
+import math
 from PIL import Image
 from PIL import ImageDraw
 
 # Copied from http://en.wikipedia.org/wiki/Code_128
 # Value Weights 128A    128B    128C
-CODE128_CHART = """
+CODE128_CHART = r"""
 0       212222  space   space   00
 1       222122  !       !       01
 2       222221  "       "       02
@@ -128,8 +129,8 @@ CODE128_CHART = """
 106     2331112 Stop    Stop    Stop
 """.split()
 
-VALUES   = [int(value) for value in CODE128_CHART[0::5]]
-WEIGHTS  = dict(zip(VALUES, CODE128_CHART[1::5]))
+VALUES = [int(value) for value in CODE128_CHART[0::5]]
+WEIGHTS = dict(zip(VALUES, CODE128_CHART[1::5]))
 CODE128A = dict(zip(CODE128_CHART[2::5], VALUES))
 CODE128B = dict(zip(CODE128_CHART[3::5], VALUES))
 CODE128C = dict(zip(CODE128_CHART[4::5], VALUES))
@@ -142,36 +143,36 @@ def code128_format(data):
     """
     Generate an optimal barcode from ASCII text
     """
-    text     = str(data)
-    pos      = 0
-    length   = len(text)
+    text = str(data)
+    pos = 0
+    length = len(text)
 
     # Start Code
     if text[:2].isdigit() and length > 1:
-        charset = CODE128C
-        codes   = [charset['StartC']]
+        chars = CODE128C
+        codes = [chars['StartC']]
     else:
-        charset = CODE128B
-        codes   = [charset['StartB']]
+        chars = CODE128B
+        codes = [chars['StartB']]
 
     # Data
     while pos < length:
-        if charset is CODE128C:
+        if chars is CODE128C:
             if text[pos:pos+2].isdigit() and length - pos > 1:
                 # Encode Code C two characters at a time
                 codes.append(int(text[pos:pos+2]))
                 pos += 2
             else:
                 # Switch to Code B
-                codes.append(charset['CodeB'])
-                charset = CODE128B
+                codes.append(chars['CodeB'])
+                chars = CODE128B
         elif text[pos:pos+4].isdigit() and length - pos >= 4:
             # Switch to Code C
-            codes.append(charset['CodeC'])
-            charset = CODE128C
+            codes.append(chars['CodeC'])
+            chars = CODE128C
         else:
             # Encode Code B one character at a time
-            codes.append(charset[text[pos]])
+            codes.append(chars[text[pos]])
             pos += 1
 
     # Checksum
@@ -181,11 +182,11 @@ def code128_format(data):
     codes.append(checksum % 103)
 
     # Stop Code
-    codes.append(charset['Stop'])
+    codes.append(chars['Stop'])
     return codes
 
 
-def code128_image(data, height=100, thickness=3, quiet_zone=True):
+def code128_image(data, height=100, thickness=2, quiet_zone=True):
     if not data[-1] == CODE128B['Stop']:
         data = code128_format(data)
 
@@ -193,7 +194,7 @@ def code128_image(data, height=100, thickness=3, quiet_zone=True):
     for code in data:
         for weight in WEIGHTS[code]:
             barcode_widths.append(int(weight) * thickness)
-    width = sum(barcode_widths)
+    width = math.ceil(sum(barcode_widths))
     x = 0
 
     if quiet_zone:
@@ -201,7 +202,7 @@ def code128_image(data, height=100, thickness=3, quiet_zone=True):
         x = 10 * thickness
 
     # Monochrome Image
-    img  = Image.new('1', (width, height), 1)
+    img = Image.new('1', (width, height), 1)
     draw = ImageDraw.Draw(img)
     draw_bar = True
     for width in barcode_widths:
