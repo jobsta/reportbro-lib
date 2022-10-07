@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming Release
+## [3.0.0] - 2022-10-10
 
 ### Features
 * Support processing of nested parameters and rendering nested sections (PLUS version)
