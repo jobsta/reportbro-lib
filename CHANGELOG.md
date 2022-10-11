@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.2] - 2022-10-11
+
+### Bug Fixes
+* Do not throw error for image parameter without image data
+
 ## [3.0.1] - 2022-10-11
 
 ### Bug Fixes
