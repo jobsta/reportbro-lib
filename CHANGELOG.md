@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.1] - 2022-10-11
+
+### Bug Fixes
+* Add data directory init file needed for importlib.resources module
+
 ## [3.0.0] - 2022-10-10
 
 ### Features
