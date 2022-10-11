@@ -724,20 +724,21 @@ class Report:
                     value = self.parse_parameter_value(parameter, parent_id, is_test_data, parameter_type, value)
                     dest_data[parameter.name] = value
                 elif parameter_type == ParameterType.image:
-                    if isinstance(value, str):
-                        # base64 encoded image data
-                        if not value.startswith('data:image'):
+                    if value:
+                        if isinstance(value, str):
+                            # base64 encoded image data
+                            if not value.startswith('data:image'):
+                                raise ReportBroInternalError(
+                                    f'value of parameter {parameter.name} must be base64 encoded image data '
+                                    'and start with "data:image"', log_error=False)
+                        elif isinstance(value, IOBase):
+                            # image passed as file object
+                            pass
+                        else:
                             raise ReportBroInternalError(
-                                f'value of parameter {parameter.name} must be base64 encoded image data '
-                                'and start with "data:image"', log_error=False)
-                    elif isinstance(value, IOBase):
-                        # image passed as file object
-                        pass
-                    else:
-                        raise ReportBroInternalError(
-                            f'value of image parameter {parameter.name} must string with base64 encoded image data '
-                            'or a file object of the image', log_error=False)
-                    dest_data[parameter.name] = value
+                                f'value of image parameter {parameter.name} must be string with base64 encoded '
+                                'image data or a file object of the image', log_error=False)
+                        dest_data[parameter.name] = value
                 elif parameter_type == ParameterType.simple_array:
                     if isinstance(value, list):
                         list_values = []
