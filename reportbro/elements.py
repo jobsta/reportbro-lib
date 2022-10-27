@@ -1407,6 +1407,7 @@ class FrameElement(DocElement):
                 self.rendering_complete = self.container.create_render_elements(
                     container_top, content_height, ctx, pdf_doc)
         else:
+            self.container.clear_rendered_elements()
             self.rendering_complete = self.container.create_render_elements(
                 container_top, content_height, ctx, pdf_doc)
         self.render_bottom = offset_y + self.get_render_bottom()
