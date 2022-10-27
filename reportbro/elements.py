@@ -949,6 +949,9 @@ class TableElement(DocElement):
                             return render_element, False
                     else:
                         content_row.rendering_complete = True
+
+                content_row.update_group_changed_row_indices()
+
                 self.content_row_index += 1
             ctx.pop_context()
 
@@ -1174,6 +1177,16 @@ class TableBandElement(object):
                 if self.group_expr_result != self.next_group_expr_result:
                     self.group_changed_row_indices.append(row_index)
 
+    def update_group_changed_row_indices(self):
+        """
+        The internal array of changed row indices for groups is updated in
+        case a group row was currently rendered.
+
+        Must be called after the row was processed.
+        """
+        if self.rendering_complete and self.group_changed:
+            self.group_changed_row_indices.pop(0)
+
     def prepare(self, ctx, row_index=None):
         if self.group_expression:
             self.group_changed = False
@@ -1295,9 +1308,6 @@ class TableBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
-
-        if self.rendering_complete and self.group_changed:
-            self.group_changed_row_indices.pop(0)
 
     def get_render_bottom(self):
         return self.container.render_bottom
