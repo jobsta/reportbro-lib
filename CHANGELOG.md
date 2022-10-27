@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.3] - 2022-10-27
+
+### Bug Fixes
+* Fix rendering frame which does not fit on one page
+
 ## [3.0.2] - 2022-10-11
 
 ### Bug Fixes
