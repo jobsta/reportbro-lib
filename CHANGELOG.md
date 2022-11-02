@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.4] - 2022-11-02
+
+### Bug Fixes
+* Fix rendering table content band with group expression when a previous group row is not printed
+
 ## [3.0.3] - 2022-10-27
 
 ### Bug Fixes
