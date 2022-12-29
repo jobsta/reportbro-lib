@@ -75,13 +75,14 @@ class Context:
                     # nested map
                     if field_name in parameter.fields and collection_name in data:
                         parameter = parameter.fields[field_name]
-                        data = data[collection_name]
+                        data = data[collection_name] or dict()
                     else:
                         return None
 
                 if field_name in parameter.fields and collection_name in data:
                     return ParameterRef(
-                        parameter=parameter.fields[field_name], data=data[collection_name], data_context=data)
+                        parameter=parameter.fields[field_name], data=data[collection_name] or dict(),
+                        data_context=data)
             return None
         else:
             return self._get_parameter(name)
