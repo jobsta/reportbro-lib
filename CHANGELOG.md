@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.5] - 2022-12-30
+
+### Bug Fixes
+* Fix error when accessing map parameter with None value
+
 ## [3.0.4] - 2022-11-02
 
 ### Bug Fixes
