@@ -9,6 +9,7 @@
 ### Changes
 * Create barcodes as SVG to allow arbitrary barcode sizes and losless scaling
 * Raise error when there is not enough space to render CODE128 barcode
+* poetry >= 1.2.2 is required (poetry lock format v2 is used now)
 
 ### Bug Fixes
 * Fix rendering of barcode and image inside section

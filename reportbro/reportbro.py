@@ -1,4 +1,3 @@
-#
 # Copyright (C) 2017-2022 jobsta
 #
 # This file is part of ReportBro, a library to generate PDF and Excel reports.
@@ -23,6 +22,7 @@ import xlsxwriter
 from copy import deepcopy
 from babel import Locale
 from io import BufferedReader, IOBase
+from datetime import datetime
 
 from .containers import ReportBand
 from .elements import *
@@ -297,6 +297,12 @@ class DocumentProperties:
         if self.content_height == 0:
             self.content_height = self.page_height - self.header_size - self.footer_size -\
                 self.margin_top - self.margin_bottom
+
+        creation_date = data.get('creationDate')
+        if creation_date:
+            self.creation_date = parse_datetime_string(creation_date)
+        else:
+            self.creation_date = None
 
 
 class ImageData:
