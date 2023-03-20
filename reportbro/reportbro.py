@@ -127,8 +127,7 @@ class DocumentPDFRenderer:
 
         self.header_band.cleanup()
         self.footer_band.cleanup()
-        dest = 'F' if self.filename else 'S'
-        return self.pdf_doc.output(name=self.filename, dest=dest)
+        return self.pdf_doc.output(name=self.filename)
 
 
 class DocumentXLSXRenderer:
