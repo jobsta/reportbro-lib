@@ -20,6 +20,8 @@ import importlib.resources
 import re
 import os
 import xlsxwriter
+from copy import deepcopy
+from babel import Locale
 from io import BufferedReader, IOBase
 
 from .containers import ReportBand
@@ -262,6 +264,15 @@ class DocumentProperties:
         self.pattern_currency_symbol = data.get('patternCurrencySymbol', '')
         if self.pattern_locale not in ('de', 'en', 'es', 'fr', 'it'):
             raise ReportBroInternalError('invalid pattern_locale', log_error=False)
+        self.pattern_number_group_symbol = data.get('patternNumberGroupSymbol', '')
+        if self.pattern_number_group_symbol and len(self.pattern_number_group_symbol) > 1:
+            raise ReportBroInternalError('invalid pattern_number_group_symbol', log_error=False)
+
+        if self.pattern_number_group_symbol:
+            rbro_locale = Locale(self.pattern_locale)
+            rbro_locale.number_symbols  # ensure instance has been populated
+            self.pattern_locale = deepcopy(rbro_locale)
+            self.pattern_locale.number_symbols['group'] = self.pattern_number_group_symbol
 
         self.header = bool(data.get('header'))
         if self.header:
