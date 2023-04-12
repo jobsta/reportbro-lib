@@ -941,6 +941,8 @@ class TableElement(DocElement):
                             ctx.pop_context()
                             return render_element, False
 
+                        content_row.postprocess(row_index=self.row_index)
+
                         # only perform page break after content if this is not the last row
                         if content_row.page_break and not content_row.before_group and\
                                 self.row_index < (self.row_count - 1):
@@ -949,8 +951,6 @@ class TableElement(DocElement):
                             return render_element, False
                     else:
                         content_row.rendering_complete = True
-
-                content_row.update_group_changed_row_indices()
 
                 self.content_row_index += 1
             ctx.pop_context()
@@ -1045,6 +1045,8 @@ class TableElement(DocElement):
                         columns = len(content_row.printed_cells)
                     row, _ = content_row.render_spreadsheet(
                         row, col, ctx, renderer, row_index=self.row_index)
+                    content_row.postprocess(row_index=self.row_index)
+
             ctx.pop_context()
             self.row_index += 1
 
@@ -1177,16 +1179,6 @@ class TableBandElement(object):
                 if self.group_expr_result != self.next_group_expr_result:
                     self.group_changed_row_indices.append(row_index)
 
-    def update_group_changed_row_indices(self):
-        """
-        The internal array of changed row indices for groups is updated in
-        case a group row was currently rendered.
-
-        Must be called after the row was processed.
-        """
-        if self.rendering_complete and self.group_changed:
-            self.group_changed_row_indices.pop(0)
-
     def prepare(self, ctx, row_index=None):
         if self.group_expression:
             self.group_changed = False
@@ -1207,6 +1199,18 @@ class TableBandElement(object):
         if self.print_if:
             self.print_if_result = ctx.evaluate_expression(
                 self.print_if, self.id, field='printIf')
+
+    def postprocess(self, row_index):
+        """
+        Must be called after a row was processed for this band.
+
+        The internal array of changed row indices for groups is updated in
+        case a group row was currently rendered.
+
+        :param row_index: current row index when the band was processed.
+        """
+        if self.group_changed_row_indices and self.group_changed_row_indices[0] == row_index:
+            self.group_changed_row_indices.pop(0)
 
     def set_parameter_range(self, parameter, ctx, clear=False):
         """
