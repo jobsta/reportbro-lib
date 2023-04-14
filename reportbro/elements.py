@@ -1329,6 +1329,7 @@ class FrameElement(DocElement):
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
+        self.align_to_page_bottom = bool(data.get('alignToPageBottom'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
@@ -1384,6 +1385,11 @@ class FrameElement(DocElement):
             if rendering_complete and needed_height <= available_height:
                 # rendering is complete and all elements of frame fit on current page
                 self.rendering_complete = True
+                if self.align_to_page_bottom:
+                    spacer = available_height - needed_height
+                    render_element.render_y += spacer
+                    self.render_y += spacer
+                    needed_height = available_height
                 self.render_bottom = offset_y + needed_height
                 self.render_element_type = RenderElementType.complete
                 render_element.add_elements(self.container, self.render_element_type, needed_height)
