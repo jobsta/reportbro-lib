@@ -1,9 +1,10 @@
 # Changelog
 
-## [3.1.0] - 2023-04-18
+## [3.1.0] - 2023-04-19
 
 ### Features
 * Support option to align frame to bottom of page
+* Support setting "Thousands separator" for number formatting
 
 ### Bug Fixes
 * Fix processing of table rows with group expression
