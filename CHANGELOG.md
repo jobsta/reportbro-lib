@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.0] - 2023-04-18
+
+### Features
+* Support option to align frame to bottom of page
+
+### Bug Fixes
+* Fix processing of table rows with group expression
+
 ## [3.0.5] - 2022-12-30
 
 ### Bug Fixes
