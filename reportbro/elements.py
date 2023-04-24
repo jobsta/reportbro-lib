@@ -1,20 +1,20 @@
 from babel.numbers import format_decimal
 from babel.dates import format_datetime
+from barcode import Code128, Code39, EAN8, EAN13, UPCA
+from barcode.errors import BarcodeError
 from io import BytesIO
 import copy
 import datetime
 import decimal
 import PIL
 import qrcode
-import tempfile
-import urllib
+import qrcode.image.svg
 
-from .barcode128 import code128_image
 from .context import Context
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
-from .rendering import ImageRenderElement, BarCodeRenderElement, TableRenderElement,\
+from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
 from .structs import Color, BorderStyle, TextStyle
 from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
@@ -108,9 +108,16 @@ class BarCodeElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = get_str_value(data, 'content')
         self.format = get_str_value(data, 'format').lower()
-        assert self.format in ('code128', 'qrcode')
-        self.display_value = bool(data.get('displayValue')) if self.format == 'code128' else False
+        assert self.format in ('code39', 'code128', 'ean8', 'ean13', 'upc', 'qrcode')
+        self.display_value = bool(data.get('displayValue'))
+        self.guardbar = bool(data.get('guardBar'))
+        if self.format not in ('ean8', 'ean13'):
+            self.guardbar = False
         self.bar_width = get_float_value(data, 'barWidth')
+        self.rotate = bool(data.get('rotateBarCode'))
+        if self.format == 'qrcode':
+            self.display_value = False
+            self.rotate = False
         error_correction_level = get_str_value(data, 'errorCorrectionLevel')
         self.error_correction_level = qrcode.ERROR_CORRECT_M
         if error_correction_level == 'L':
@@ -125,8 +132,12 @@ class BarCodeElement(DocElement):
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
-        self.image_key = None
-        self.image_height = self.height - 22 if (self.display_value and self.format == 'code128') else self.height
+        self.svg_data = None
+        self.barcode_width = 0
+        self.barcode_height = self.height
+        if self.display_value:
+            # save space for barcode value as text
+            self.barcode_height -= 22
         self.prepared_content = None
 
     def is_printed(self, ctx):
@@ -135,35 +146,54 @@ class BarCodeElement(DocElement):
         return DocElementBase.is_printed(self, ctx)
 
     def prepare(self, ctx, pdf_doc, only_verify):
-        self.image_key = None
         self.prepared_content = ctx.fill_parameters(self.content, self.id, field='content')
         if self.prepared_content:
-            try:
-                if self.format == 'qrcode':
-                    img = qrcode.make(self.prepared_content, border=0, error_correction=self.error_correction_level)
-                elif self.format == 'code128':
-                    img = code128_image(
-                        self.prepared_content, height=self.image_height, thickness=self.bar_width, quiet_zone=False)
-            except:
-                raise ReportBroError(
-                    Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
-            if not only_verify:
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as f:
-                    img.save(f.name)
-                    self.image_key = f.name
-                    if self.format == 'qrcode':
-                        # QR Code is always quadratic and only height can be set -> use same value for width
-                        self.width = self.height
-                    else:
-                        # for Code128 the width is defined by the image width of the bar code
-                        self.width = img.width
+            self.svg_data = BytesIO()
+            if self.format == 'qrcode':
+                qr = qrcode.make(
+                    self.prepared_content, error_correction=self.error_correction_level, border=0,
+                    image_factory=qrcode.image.svg.SvgPathImage)
+                # use defined height in layout since qr code is quadratic
+                self.barcode_width = self.barcode_height
+
+                if not only_verify:
+                    qr.save(self.svg_data)
+
+            else:
+                svg_writer = BarcodeSVGWriter()
+                barcode = None
+                try:
+                    if self.format == 'code39':
+                        barcode = Code39(self.content, writer=svg_writer)
+                    elif self.format == 'code128':
+                        barcode = Code128(self.content, writer=svg_writer)
+                    elif self.format == 'ean8':
+                        barcode = EAN8(self.content, writer=svg_writer, guardbar=self.guardbar)
+                    elif self.format == 'ean13':
+                        barcode = EAN13(self.content, writer=svg_writer, guardbar=self.guardbar)
+                    elif self.format == 'upc':
+                        barcode = UPCA(self.content, writer=svg_writer)
+                except BarcodeError:
+                    raise ReportBroError(Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
+                assert barcode
+
+                if not only_verify:
+                    barcode_height = self.barcode_height
+                    if self.guardbar:
+                        # guardbars are longer than normal bars, therefor we reduce the height for the
+                        # normal bars so the maximum height is not exceeded
+                        barcode_height -= 7
+                    barcode.write(self.svg_data, options=dict(
+                        module_width=self.bar_width, module_height=barcode_height,
+                        write_text=False, quiet_zone=0)
+                    )
+                    self.barcode_width = svg_writer.barcode_width
 
     def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
-        _, rv = DocElement.get_next_render_element(
-            self, offset_y, container_top, container_height, ctx, pdf_doc)
-        if not rv:
-            return None, False
-        return BarCodeRenderElement(self.report, offset_y, self), True
+        height = self.barcode_width if self.rotate else self.height
+        if offset_y + height <= container_height:
+            return BarCodeRenderElement(self.report, offset_y, self), True
+        return None, False
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         if self.content:
@@ -379,7 +409,7 @@ class TextElement(DocElement):
                 tmp_height = line_height
                 if self.line_index == 0:
                     tmp_height += self.used_style.padding_top
-                if  last_line:
+                if last_line:
                     tmp_height += self.used_style.padding_bottom
                 if tmp_height > remaining_height:
                     break
