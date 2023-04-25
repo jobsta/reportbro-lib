@@ -51,6 +51,7 @@ class DocumentPDFRenderer:
         self.filename = filename
         self.add_watermark = add_watermark
         self.page_limit = page_limit
+        self.creation_date = report.creation_date
 
     def add_page(self):
         self.pdf_doc.add_page()
@@ -127,6 +128,10 @@ class DocumentPDFRenderer:
 
         self.header_band.cleanup()
         self.footer_band.cleanup()
+
+        if self.creation_date:
+            self.pdf_doc.set_creation_date(self.creation_date)
+
         return self.pdf_doc.output(name=self.filename)
 
 
@@ -138,6 +143,8 @@ class DocumentXLSXRenderer:
         self.document_properties = report.document_properties
         self.workbook_mem = BytesIO()
         self.workbook = xlsxwriter.Workbook(filename if filename else self.workbook_mem)
+        if report.creation_date:
+            self.workbook.set_properties({'created': report.creation_date})
         self.worksheet = self.workbook.add_worksheet()
         self.context = context
         self.filename = filename
@@ -613,6 +620,8 @@ class Report:
         except ReportBroError as err:
             self.errors.append(err.error)
 
+        self.creation_date = None
+
     def load_image(self, image_key, ctx, image_id, source, image_file):
         # test if image is not already loaded into image cache
         if image_key not in self.images:
@@ -901,3 +910,6 @@ class Report:
                 dest_data[parameter.name] = value
             else:
                 data[parameter.name] = value
+
+    def set_creation_date(self, creation_date):
+        self.creation_date = parse_datetime_string(creation_date)
