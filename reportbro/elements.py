@@ -108,7 +108,7 @@ class BarCodeElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = get_str_value(data, 'content')
         self.format = get_str_value(data, 'format').lower()
-        if self.format not in ('code128', 'qrcode'):
+        if self.format not in ('code39', 'code128', 'ean8', 'ean13', 'upc', 'qrcode'):
             raise ReportBroInternalError(f'invalid format for barcode element {self.id}', log_error=False)
         self.display_value = bool(data.get('displayValue'))
         self.guardbar = bool(data.get('guardBar'))
