@@ -134,7 +134,7 @@ class BarCodeElement(DocElement):
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.svg_data = None
         self.barcode_width = 0
-        self.barcode_height = self.height
+        self.barcode_height = self.width if self.rotate else self.height
         if self.display_value:
             # save space for barcode value as text
             self.barcode_height -= 22
