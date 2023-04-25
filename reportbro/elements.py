@@ -162,19 +162,46 @@ class BarCodeElement(DocElement):
             else:
                 svg_writer = BarcodeSVGWriter()
                 barcode = None
+                checksum_digit = None  # checksum digit in given barcode value
+                checksum = None
+                digits = dict(ean8=EAN8.digits, ean13=EAN13.digits, upc=UPCA.digits).get(self.format, 0)
+                if digits and len(self.prepared_content) > digits:
+                    # barcode assumes certain number of digits + one optional checksum digit
+                    if len(self.prepared_content) > digits + 1:
+                        raise ReportBroError(
+                            Error('errorMsgInvalidBarCode', object_id=self.id, field='content',
+                                  info='barcode value too long'))
+                    else:
+                        # barcode value contains checksum digit
+                        checksum_digit = self.prepared_content[digits]
+
                 try:
                     if self.format == 'code39':
-                        barcode = Code39(self.content, writer=svg_writer)
+                        barcode = Code39(self.prepared_content, writer=svg_writer)
+                        self.prepared_content = barcode.code  # make sure value is upper case and contains checksum
                     elif self.format == 'code128':
-                        barcode = Code128(self.content, writer=svg_writer)
+                        barcode = Code128(self.prepared_content, writer=svg_writer)
                     elif self.format == 'ean8':
-                        barcode = EAN8(self.content, writer=svg_writer, guardbar=self.guardbar)
+                        barcode = EAN8(self.prepared_content, writer=svg_writer, guardbar=self.guardbar)
+                        self.prepared_content = barcode.ean  # make sure value contains checksum
+                        checksum = barcode.ean[-1]
                     elif self.format == 'ean13':
-                        barcode = EAN13(self.content, writer=svg_writer, guardbar=self.guardbar)
+                        barcode = EAN13(self.prepared_content, writer=svg_writer, guardbar=self.guardbar)
+                        self.prepared_content = barcode.ean  # make sure value contains checksum
+                        checksum = barcode.ean[-1]
                     elif self.format == 'upc':
-                        barcode = UPCA(self.content, writer=svg_writer)
-                except BarcodeError:
-                    raise ReportBroError(Error('errorMsgInvalidBarCode', object_id=self.id, field='content'))
+                        barcode = UPCA(self.prepared_content, writer=svg_writer)
+                        self.prepared_content = barcode.upc  # make sure value contains checksum
+                        checksum = barcode.upc[-1]
+
+                    if checksum_digit and checksum_digit != checksum:
+                        # checksum digit is present in bar code value but does not match calculated checksum
+                        raise ReportBroError(
+                            Error('errorMsgInvalidBarCode', object_id=self.id, field='content',
+                                  info='invalid checksum'))
+                except BarcodeError as ex:
+                    raise ReportBroError(
+                        Error('errorMsgInvalidBarCode', object_id=self.id, field='content', info=str(ex)))
                 assert barcode
 
                 if not only_verify:
