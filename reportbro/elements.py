@@ -114,7 +114,7 @@ class BarCodeElement(DocElement):
         if self.format not in ('ean8', 'ean13'):
             self.guardbar = False
         self.bar_width = get_float_value(data, 'barWidth')
-        self.rotate = bool(data.get('rotateBarCode'))
+        self.rotate = bool(data.get('rotate'))
         if self.format == 'qrcode':
             self.display_value = False
             self.rotate = False
