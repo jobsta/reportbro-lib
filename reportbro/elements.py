@@ -199,7 +199,7 @@ class BarCodeElement(DocElement):
                         raise ReportBroError(
                             Error('errorMsgInvalidBarCode', object_id=self.id, field='content',
                                   info='invalid checksum'))
-                except BarcodeError as ex:
+                except (BarcodeError, KeyError) as ex:
                     raise ReportBroError(
                         Error('errorMsgInvalidBarCode', object_id=self.id, field='content', info=str(ex)))
                 assert barcode
