@@ -108,12 +108,17 @@ class BarCodeElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = get_str_value(data, 'content')
         self.format = get_str_value(data, 'format').lower()
-        assert self.format in ('code39', 'code128', 'ean8', 'ean13', 'upc', 'qrcode')
+        if self.format not in ('code128', 'qrcode'):
+            raise ReportBroInternalError(f'invalid format for barcode element {self.id}', log_error=False)
         self.display_value = bool(data.get('displayValue'))
         self.guardbar = bool(data.get('guardBar'))
         if self.format not in ('ean8', 'ean13'):
             self.guardbar = False
-        self.bar_width = get_float_value(data, 'barWidth')
+        # use default for bar_width if setting is not available since setting was introduced in a later version
+        # and could be missing in an older report definition
+        self.bar_width = get_float_value(data, 'barWidth') if 'barWidth' in data else 2.0
+        if self.format != 'qrcode' and (self.bar_width < 0.3 or self.bar_width > 3.0):
+            raise ReportBroInternalError(f'bar width for barcode element {self.id} is out of range', log_error=False)
         self.rotate = bool(data.get('rotate'))
         if self.format == 'qrcode':
             self.display_value = False
