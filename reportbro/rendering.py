@@ -239,14 +239,19 @@ class BarCodeRenderElement(DocElementBase):
                 pdf_doc.set_font('courier', 'B', 18)
                 pdf_doc.set_text_color(0, 0, 0)
                 content_width = pdf_doc.get_string_width(self.content)
-                # show barcode value centered and below barcode
+                # show barcode value centered and below barcode,
+                # in case text is larger than barcode we show the text at same position as barcode
                 if rotate_angle:
                     offset_y = (self.height - content_width) / 2
+                    if offset_y < 0:
+                        offset_y = 0
                     with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
                         # because we rotate by 270 degrees ccw we have to adapt the y offset on the x coordinate
                         pdf_doc.text(x + offset_y, y, self.content)
                 else:
                     offset_x = (self.width - content_width) / 2
+                    if offset_x < 0:
+                        offset_x = 0
                     pdf_doc.text(x + offset_x, y + self.height + 20, self.content)
 
     def cleanup(self):
