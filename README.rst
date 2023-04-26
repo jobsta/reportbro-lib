@@ -41,7 +41,9 @@ License
 
 - Commercial license
 
-If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/license/index.
+If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/license/index
+
+This license includes ReportBro PLUS with additional features.
 
 - Open-source license
 
