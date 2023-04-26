@@ -68,9 +68,9 @@ class ImageElement(DocElement):
                 raise ReportBroError(
                     Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         _, rv = DocElement.get_next_render_element(
-            self, offset_y, container_top, container_height, ctx, pdf_doc)
+            self, offset_y, container_top, container_width, container_height, ctx, pdf_doc)
         if not rv:
             return None, False
         return ImageRenderElement(self.report, offset_y, self), True
@@ -221,7 +221,12 @@ class BarCodeElement(DocElement):
                     )
                     self.barcode_width = svg_writer.barcode_width
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+        # make sure barcode fits inside available space of container when barcode width depends on barcode value
+        if self.format in ('code39', 'code128') and not self.rotate and self.x + self.barcode_width > container_width:
+            raise ReportBroError(
+                Error('errorMsgInvalidSize', object_id=self.id, field='height'))
+
         height = self.barcode_width if self.rotate else self.height
         if offset_y + height <= container_height:
             self.render_y = offset_y
@@ -420,7 +425,7 @@ class TextElement(DocElement):
                 self.space_top = remaining_space
         self.total_height = total_height + self.space_top + self.space_bottom
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         available_height = container_height - offset_y
         if self.always_print_on_same_page and self.first_render_element and\
                 self.total_height > available_height and (offset_y != 0 or container_top != 0):
@@ -951,7 +956,7 @@ class TableElement(DocElement):
             self.footer.set_printed_cells(ctx)
             self.footer.prepare(ctx)
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
         if self.is_rendering_complete():
@@ -1425,7 +1430,7 @@ class FrameElement(DocElement):
         self.prev_page_content_height = 0
         self.render_element_type = RenderElementType.none
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         available_height = container_height - offset_y
         content_height = container_height
@@ -1673,7 +1678,7 @@ class SectionElement(DocElement):
             if self.footer:
                 self.footer.prepare(ctx, pdf_doc=None, only_verify=True)
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
         render_element = SectionRenderElement(self.report, render_y=offset_y)

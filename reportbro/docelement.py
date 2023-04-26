@@ -82,7 +82,7 @@ class DocElementBase(object):
             self.render_bottom = offset_y + self.height
         self.rendering_complete = True
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.rendering_complete = True
         return None, True
 
@@ -105,7 +105,7 @@ class DocElement(DocElementBase):
         self.height = get_int_value(data, 'height')
         self.bottom = self.y + self.height
 
-    def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         if offset_y + self.height <= container_height:
             self.render_y = offset_y
             self.render_bottom = offset_y + self.height
