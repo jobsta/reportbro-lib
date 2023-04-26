@@ -223,8 +223,7 @@ class BarCodeElement(DocElement):
 
     def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         content_width = 0
-        # only calculate value text width if needed
-        if self.display_value and (self.rotate or self.format in ('code39', 'code128')):
+        if self.display_value:
             pdf_doc.set_font('courier', 'B', 18)
             content_width = pdf_doc.get_string_width(self.prepared_content)
 
@@ -246,7 +245,7 @@ class BarCodeElement(DocElement):
             self.render_y = offset_y
             self.render_bottom = offset_y + height
             self.rendering_complete = True
-            return BarCodeRenderElement(self.report, offset_y, self), True
+            return BarCodeRenderElement(self.report, offset_y, content_width=content_width, barcode=self), True
         return None, False
 
     def render_spreadsheet(self, row, col, ctx, renderer):

@@ -192,7 +192,7 @@ class BarcodeSVGWriter(SVGWriter):
 
 
 class BarCodeRenderElement(DocElementBase):
-    def __init__(self, report, render_y, barcode):
+    def __init__(self, report, render_y, content_width, barcode):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
         self.x = barcode.x
@@ -205,12 +205,13 @@ class BarCodeRenderElement(DocElementBase):
         if barcode.rotate:
             self.width = barcode.barcode_height
             self.height = barcode.barcode_width
-            render_height = barcode.barcode_width
+            render_height = barcode.barcode_width if barcode.barcode_width > content_width else content_width
         else:
             self.width = barcode.barcode_width
             self.height = barcode.barcode_height
             render_height = barcode.height
         self.svg_data = barcode.svg_data
+        self.content_width = content_width  # width of content text when barcode value is displayed
         self.render_bottom = render_y + render_height
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
@@ -238,18 +239,17 @@ class BarCodeRenderElement(DocElementBase):
                 # ourself with a normal text item
                 pdf_doc.set_font('courier', 'B', 18)
                 pdf_doc.set_text_color(0, 0, 0)
-                content_width = pdf_doc.get_string_width(self.content)
                 # show barcode value centered and below barcode,
                 # in case text is larger than barcode we show the text at same position as barcode
                 if rotate_angle:
-                    offset_y = (self.height - content_width) / 2
+                    offset_y = (self.height - self.content_width) / 2
                     if offset_y < 0:
                         offset_y = 0
                     with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
                         # because we rotate by 270 degrees ccw we have to adapt the y offset on the x coordinate
                         pdf_doc.text(x + offset_y, y, self.content)
                 else:
-                    offset_x = (self.width - content_width) / 2
+                    offset_x = (self.width - self.content_width) / 2
                     if offset_x < 0:
                         offset_x = 0
                     pdf_doc.text(x + offset_x, y + self.height + 20, self.content)
