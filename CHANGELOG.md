@@ -8,6 +8,7 @@
 
 ### Changes
 * Create barcodes as SVG to allow arbitrary barcode sizes and losless scaling
+* Raise error when there is not enough space to render CODE128 barcode
 
 ### Bug Fixes
 * Fix rendering of barcode and image inside section
