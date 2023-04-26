@@ -1,8 +1,9 @@
+from barcode.writer import SVGWriter, create_svg_object, pt2mm
+
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError
 from .utils import get_image_display_size
-import os
 
 
 class ImageRenderElement(DocElementBase):
@@ -13,7 +14,7 @@ class ImageRenderElement(DocElementBase):
         self.width = image.width
         self.height = image.height
         self.render_y = render_y
-        self.render_bottom = render_y
+        self.render_bottom = render_y + self.height
         self.background_color = image.background_color
         self.horizontal_alignment = image.horizontal_alignment
         self.vertical_alignment = image.vertical_alignment
@@ -64,36 +65,199 @@ class ImageRenderElement(DocElementBase):
                                  image_display_width, image_display_height, self.prepared_link)
 
 
+class BarcodeSVGWriter(SVGWriter):
+    """
+    SVGWriter class adapted for ReportBro needs. Size values are specified without unit
+    because fpdf cannot handle svg with unit value. Further some minor adaptations are made
+    for size and position for exact layout.
+    """
+
+    @staticmethod
+    def get_size_value(size):
+        """
+        Return formatted size value to 3 decimal places, without unit type.
+        """
+        return "{0:.3f}".format(size)
+
+    @staticmethod
+    def set_attributes(element, **attributes):
+        """
+        Same as barcode.writer._set_attributes
+
+        Because it is "private" we do not import it and define it as static method here.
+        """
+        for key, value in attributes.items():
+            element.setAttribute(key, value)
+
+    def __init__(self):
+        SVGWriter.__init__(self)
+        # width of generated barcode, available after barcode was created
+        self._barcode_width = None
+
+    @property
+    def barcode_width(self):
+        # make sure barcode was generated before accessing property
+        assert self._barcode_width is not None
+        return self._barcode_width
+
+    def calculate_size(self, modules_per_line, number_of_lines):
+        """Calculates the size of the barcode in pixel.
+
+        :parameters:
+            modules_per_line : Integer
+                Number of modules in one line.
+            number_of_lines : Integer
+                Number of lines of the barcode.
+
+        :returns: Width and height of the barcode in pixel.
+        :rtype: Tuple
+        """
+        width = 2 * self.quiet_zone + modules_per_line * self.module_width
+        # we do not add 2.0 to height (as is done in BaseWriter.calculate_size) to get
+        # barcode height as defined in report layout
+        height = self.module_height * number_of_lines
+        number_of_text_lines = len(self.text.splitlines())
+        if self.font_size and self.text:
+            height += (
+                pt2mm(self.font_size) / 2 * number_of_text_lines + self.text_distance
+            )
+            height += self.text_line_distance * (number_of_text_lines - 1)
+        return width, height
+
+    def _init(self, code):
+        width, height = self.calculate_size(len(code[0]), len(code))
+        # save width of generated barcode
+        self._barcode_width = width
+        self._document = create_svg_object(self.with_doctype)
+        self._root = self._document.documentElement
+        attributes = {
+            "width": BarcodeSVGWriter.get_size_value(width),
+            "height": BarcodeSVGWriter.get_size_value(height),
+        }
+        BarcodeSVGWriter.set_attributes(self._root, **attributes)
+        # create group for easier handling in 3rd party software
+        # like corel draw, inkscape, ...
+        group = self._document.createElement("g")
+        attributes = {"id": "barcode_group"}
+        BarcodeSVGWriter.set_attributes(group, **attributes)
+        self._group = self._root.appendChild(group)
+        background = self._document.createElement("rect")
+        # use exact size instead of "100%" because fpdf cannot handle percent values
+        attributes = {
+            "width": BarcodeSVGWriter.get_size_value(width),
+            "height": BarcodeSVGWriter.get_size_value(height),
+            "style": f"fill:{self.background}",
+        }
+        BarcodeSVGWriter.set_attributes(background, **attributes)
+        self._group.appendChild(background)
+
+    def _create_module(self, xpos, ypos, width, color):
+        # Background rect has been provided already, so skipping "spaces"
+        if color != self.background:
+            element = self._document.createElement("rect")
+            attributes = {
+                "x": BarcodeSVGWriter.get_size_value(xpos),
+                # ypos starts with 1.0 instead of 0.0 in BaseWriter.render of barcode lib,
+                # to have exact position we remove the offset
+                "y": BarcodeSVGWriter.get_size_value(ypos - 1.0),
+                "width": BarcodeSVGWriter.get_size_value(width),
+                "height": BarcodeSVGWriter.get_size_value(self.module_height),
+                "style": f"fill:{color};",
+            }
+            BarcodeSVGWriter.set_attributes(element, **attributes)
+            self._group.appendChild(element)
+
+    def _create_text(self, xpos, ypos):
+        # check option to override self.text with self.human (barcode as
+        # human readable data, can be used to print own formats)
+        if self.human != "":
+            barcodetext = self.human
+        else:
+            barcodetext = self.text
+        for subtext in barcodetext.split("\n"):
+            element = self._document.createElement("text")
+            attributes = {
+                "x": BarcodeSVGWriter.get_size_value(xpos),
+                "y": BarcodeSVGWriter.get_size_value(ypos),
+                "style": "fill:{};font-size:{}pt;text-anchor:middle;".format(
+                    self.foreground,
+                    self.font_size,
+                ),
+            }
+            BarcodeSVGWriter.set_attributes(element, **attributes)
+            text_element = self._document.createTextNode(subtext)
+            element.appendChild(text_element)
+            self._group.appendChild(element)
+            ypos += pt2mm(self.font_size) + self.text_line_distance
+
+
 class BarCodeRenderElement(DocElementBase):
-    def __init__(self, report, render_y, barcode):
+    def __init__(self, report, render_y, content_width, barcode):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
         self.x = barcode.x
-        self.width = barcode.width
-        self.height = barcode.height
         self.render_y = render_y
-        self.render_bottom = render_y
+        self.format = barcode.format
         self.content = barcode.prepared_content
         self.display_value = barcode.display_value
-        self.image_key = barcode.image_key
-        self.image_height = barcode.image_height
+        self.guardbar = barcode.guardbar
+        self.rotate = barcode.rotate
+        if barcode.rotate:
+            self.width = barcode.barcode_height
+            self.height = barcode.barcode_width
+            render_height = barcode.barcode_width if barcode.barcode_width > content_width else content_width
+        else:
+            self.width = barcode.barcode_width
+            self.height = barcode.barcode_height
+            render_height = barcode.height
+        self.svg_data = barcode.svg_data
+        self.content_width = content_width  # width of content text when barcode value is displayed
+        self.render_bottom = render_y + render_height
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
         y = self.render_y + container_offset_y
-        if self.image_key:
-            pdf_doc.image(self.image_key, x, y, self.width, self.image_height)
+
+        if self.format == 'qrcode':
+            pdf_doc.image(self.svg_data, x, y, self.width, self.height)
+        else:
+            rotate_angle = 0
+            if self.rotate:
+                rotate_angle = 270  # rotate 270 degrees counter clockwise
+                offset_x = self.width
+                if self.display_value:
+                    # move by 20 pixel to leave space for barcode value as text
+                    offset_x += 20
+                with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
+                    # because we rotate by 270 degrees ccw we have to adapt the x offset on the y coordinate
+                    pdf_doc.image(self.svg_data, x, y - offset_x)
+            else:
+                pdf_doc.image(self.svg_data, x, y)
+
             if self.display_value:
+                # because svg text elements are not supported in fpdf we display the value
+                # ourself with a normal text item
                 pdf_doc.set_font('courier', 'B', 18)
                 pdf_doc.set_text_color(0, 0, 0)
-                content_width = pdf_doc.get_string_width(self.content)
-                offset_x = (self.width - content_width) / 2
-                pdf_doc.text(x + offset_x, y + self.image_height + 20, self.content)
+                # show barcode value centered and below barcode,
+                # in case text is larger than barcode we show the text at same position as barcode
+                if rotate_angle:
+                    offset_y = (self.height - self.content_width) / 2
+                    if offset_y < 0:
+                        offset_y = 0
+                    with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
+                        # because we rotate by 270 degrees ccw we have to adapt the y offset on the x coordinate
+                        pdf_doc.text(x + offset_y, y, self.content)
+                else:
+                    offset_x = (self.width - self.content_width) / 2
+                    if offset_x < 0:
+                        offset_x = 0
+                    pdf_doc.text(x + offset_x, y + self.height + 20, self.content)
 
     def cleanup(self):
-        if self.image_key:
-            os.unlink(self.image_key)
-            self.image_key = None
+        if self.svg_data:
+            self.svg_data.close()
+            self.svg_data = None
 
 
 class TableRenderElement(DocElementBase):

@@ -1,5 +1,18 @@
 # Changelog
 
+## Upcoming Release
+
+### Features
+* Support additional barcodes CODE39, EAN-8, EAN-13 and UPC
+* Support option to rotate barcode
+
+### Changes
+* Create barcodes as SVG to allow arbitrary barcode sizes and losless scaling
+* Raise error when there is not enough space to render CODE128 barcode
+
+### Bug Fixes
+* Fix rendering of barcode and image inside section
+
 ## [3.1.0] - 2023-04-19
 
 ### Features

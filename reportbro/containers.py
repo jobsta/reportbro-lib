@@ -114,7 +114,8 @@ class Container(object):
                         if not new_page:
                             render_elem, complete = elem.get_next_render_element(
                                 offset_y, container_top=container_top,
-                                container_height=container_height, ctx=ctx, pdf_doc=pdf_doc)
+                                container_width=self.width, container_height=container_height,
+                                ctx=ctx, pdf_doc=pdf_doc)
                             if complete:
                                 processed_elements.append(elem)
                             if render_elem:
