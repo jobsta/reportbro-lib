@@ -9,6 +9,9 @@
 ### Changes
 * Create barcodes as SVG to allow arbitrary barcode sizes and losless scaling
 
+### Bug Fixes
+* Fix rendering of barcode and image inside section
+
 ## [3.1.0] - 2023-04-19
 
 ### Features
