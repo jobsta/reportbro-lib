@@ -222,12 +222,26 @@ class BarCodeElement(DocElement):
                     self.barcode_width = svg_writer.barcode_width
 
     def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
-        # make sure barcode fits inside available space of container when barcode width depends on barcode value
-        if self.format in ('code39', 'code128') and not self.rotate and self.x + self.barcode_width > container_width:
-            raise ReportBroError(
-                Error('errorMsgInvalidSize', object_id=self.id, field='height'))
+        content_width = 0
+        # only calculate value text width if needed
+        if self.display_value and (self.rotate or self.format in ('code39', 'code128')):
+            pdf_doc.set_font('courier', 'B', 18)
+            content_width = pdf_doc.get_string_width(self.prepared_content)
 
-        height = self.barcode_width if self.rotate else self.height
+        if self.rotate:
+            # if barcode is rotated and value is shown then the rendered height is the larger value of
+            # barcode width and value text width
+            height = self.barcode_width if self.barcode_width > content_width else content_width
+        else:
+            # make sure barcode fits inside available space of container when barcode width depends on barcode value
+            if self.format in ('code39', 'code128'):
+                width = self.barcode_width if self.barcode_width > content_width else content_width
+                if self.x + width > container_width:
+                    raise ReportBroError(
+                        Error('errorMsgInvalidSize', object_id=self.id, field='height'))
+
+            height = self.height
+
         if offset_y + height <= container_height:
             self.render_y = offset_y
             self.render_bottom = offset_y + height
