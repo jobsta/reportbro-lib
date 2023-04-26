@@ -224,6 +224,9 @@ class BarCodeElement(DocElement):
     def get_next_render_element(self, offset_y, container_top, container_height, ctx, pdf_doc):
         height = self.barcode_width if self.rotate else self.height
         if offset_y + height <= container_height:
+            self.render_y = offset_y
+            self.render_bottom = offset_y + height
+            self.rendering_complete = True
             return BarCodeRenderElement(self.report, offset_y, self), True
         return None, False
 
