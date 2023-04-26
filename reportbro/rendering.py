@@ -14,7 +14,7 @@ class ImageRenderElement(DocElementBase):
         self.width = image.width
         self.height = image.height
         self.render_y = render_y
-        self.render_bottom = render_y
+        self.render_bottom = render_y + self.height
         self.background_color = image.background_color
         self.horizontal_alignment = image.horizontal_alignment
         self.vertical_alignment = image.vertical_alignment
@@ -197,7 +197,6 @@ class BarCodeRenderElement(DocElementBase):
         self.report = report
         self.x = barcode.x
         self.render_y = render_y
-        self.render_bottom = render_y
         self.format = barcode.format
         self.content = barcode.prepared_content
         self.display_value = barcode.display_value
@@ -206,10 +205,13 @@ class BarCodeRenderElement(DocElementBase):
         if barcode.rotate:
             self.width = barcode.barcode_height
             self.height = barcode.barcode_width
+            render_height = barcode.barcode_width
         else:
             self.width = barcode.barcode_width
             self.height = barcode.barcode_height
+            render_height = barcode.height
         self.svg_data = barcode.svg_data
+        self.render_bottom = render_y + render_height
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
