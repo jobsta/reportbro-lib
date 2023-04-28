@@ -30,7 +30,6 @@ wheels/
 .idea
 
 # Unit test / coverage reports
-tests/
 htmlcov/
 .tox/
 .coverage
@@ -55,3 +54,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# macOs
+.DS_Store
