@@ -18,6 +18,7 @@ import fpdf
 import importlib.resources
 import re
 import os
+import urllib
 import xlsxwriter
 from copy import deepcopy
 from babel import Locale
@@ -458,7 +459,7 @@ class FPDFRB(fpdf.FPDF):
     def get_image(self, image_key):
         return self.loaded_images.get(image_key)
 
-    def set_font(self, family, style='', size=0, underline=False):
+    def set_font(self, family=None, style='', size=0, underline=False):
         """Set font in underlying pdf renderer.
 
         This font is used for all following text rendering calls until changed again.
@@ -466,6 +467,8 @@ class FPDFRB(fpdf.FPDF):
         :param family: name of the font which must either be one of the standard
         fonts (courier, helvetica, times) or added to ReportBro instance with the
         additional_fonts setting.
+        :param style: empty string (by default) or a combination of one or several
+        letters among B (bold), I (italic) and U (underline).
         :param size: font size, if not set then the standard font size is used.
         :param underline: True if text should be rendered with underlined style.
         :return: True if font exists, False otherwise.
