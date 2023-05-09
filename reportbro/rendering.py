@@ -67,17 +67,17 @@ class ImageRenderElement(DocElementBase):
 
 class BarcodeSVGWriter(SVGWriter):
     """
-    SVGWriter class adapted for ReportBro needs. Size values are specified without unit
-    because fpdf cannot handle svg with unit value. Further some minor adaptations are made
-    for size and position for exact layout.
+    SVGWriter class adapted for ReportBro needs. Units are specified in pt (instead of mm) so we
+    do not have to convert our ReportBro unit values.
+    Some minor adaptations are made for size and position for exact layout.
     """
 
     @staticmethod
-    def get_size_value(size):
+    def get_unit_value(size):
         """
-        Return formatted size value to 3 decimal places, without unit type.
+        Return value with pt unit type.
         """
-        return "{0:.3f}".format(size)
+        return f'{size}pt'
 
     @staticmethod
     def set_attributes(element, **attributes):
@@ -131,24 +131,27 @@ class BarcodeSVGWriter(SVGWriter):
         self._document = create_svg_object(self.with_doctype)
         self._root = self._document.documentElement
         attributes = {
-            "width": BarcodeSVGWriter.get_size_value(width),
-            "height": BarcodeSVGWriter.get_size_value(height),
+            "width": self.get_unit_value(width),
+            "height": self.get_unit_value(height),
+            # add viewBox attribute so fpdf does not output warning about missing viewBox
+            # when width and height are set
+            "viewBox": f"0 0 {width} {height}",
         }
-        BarcodeSVGWriter.set_attributes(self._root, **attributes)
+        self.set_attributes(self._root, **attributes)
         # create group for easier handling in 3rd party software
         # like corel draw, inkscape, ...
         group = self._document.createElement("g")
         attributes = {"id": "barcode_group"}
-        BarcodeSVGWriter.set_attributes(group, **attributes)
+        self.set_attributes(group, **attributes)
         self._group = self._root.appendChild(group)
         background = self._document.createElement("rect")
         # use exact size instead of "100%" because fpdf cannot handle percent values
         attributes = {
-            "width": BarcodeSVGWriter.get_size_value(width),
-            "height": BarcodeSVGWriter.get_size_value(height),
+            "width": self.get_unit_value(width),
+            "height": self.get_unit_value(height),
             "style": f"fill:{self.background}",
         }
-        BarcodeSVGWriter.set_attributes(background, **attributes)
+        self.set_attributes(background, **attributes)
         self._group.appendChild(background)
 
     def _create_module(self, xpos, ypos, width, color):
@@ -156,15 +159,15 @@ class BarcodeSVGWriter(SVGWriter):
         if color != self.background:
             element = self._document.createElement("rect")
             attributes = {
-                "x": BarcodeSVGWriter.get_size_value(xpos),
+                "x": self.get_unit_value(xpos),
                 # ypos starts with 1.0 instead of 0.0 in BaseWriter.render of barcode lib,
                 # to have exact position we remove the offset
-                "y": BarcodeSVGWriter.get_size_value(ypos - 1.0),
-                "width": BarcodeSVGWriter.get_size_value(width),
-                "height": BarcodeSVGWriter.get_size_value(self.module_height),
+                "y": self.get_unit_value(ypos - 1.0),
+                "width": self.get_unit_value(width),
+                "height": self.get_unit_value(self.module_height),
                 "style": f"fill:{color};",
             }
-            BarcodeSVGWriter.set_attributes(element, **attributes)
+            self.set_attributes(element, **attributes)
             self._group.appendChild(element)
 
     def _create_text(self, xpos, ypos):
@@ -177,14 +180,14 @@ class BarcodeSVGWriter(SVGWriter):
         for subtext in barcodetext.split("\n"):
             element = self._document.createElement("text")
             attributes = {
-                "x": BarcodeSVGWriter.get_size_value(xpos),
-                "y": BarcodeSVGWriter.get_size_value(ypos),
+                "x": self.get_unit_value(xpos),
+                "y": self.get_unit_value(ypos),
                 "style": "fill:{};font-size:{}pt;text-anchor:middle;".format(
                     self.foreground,
                     self.font_size,
                 ),
             }
-            BarcodeSVGWriter.set_attributes(element, **attributes)
+            self.set_attributes(element, **attributes)
             text_element = self._document.createTextNode(subtext)
             element.appendChild(text_element)
             self._group.appendChild(element)
