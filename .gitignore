@@ -40,6 +40,9 @@ coverage.xml
 *.cover
 .hypothesis/
 
+# Local tests
+tests/data/local/
+
 # Translations
 *.mo
 *.pot
