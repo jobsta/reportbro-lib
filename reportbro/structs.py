@@ -172,6 +172,11 @@ class Parameter:
                 rv[field.name] = Parameter.get_parameter_test_data(field, value)
             elif field.type == ParameterType.simple_array:
                 rv[field.name] = Parameter.get_parameter_test_data_simple_array(value)
+            elif field.type == ParameterType.image:
+                if isinstance(value, dict) and 'data' in value:
+                    rv[field.name] = value['data']
+                else:
+                    rv[field.name] = ''
             else:
                 rv[field.name] = value
         return rv
