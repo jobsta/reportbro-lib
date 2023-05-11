@@ -1,5 +1,6 @@
 import pytest
 import json
+import os
 from reportbro import Report
 from reportbro.structs import Parameter, ParameterType
 from hashlib import sha256
@@ -7,7 +8,7 @@ from pathlib import Path
 
 BASEDIR = Path(__file__).parent.resolve().joinpath(Path('data'))
 
-DEMOS = ['invoice', 'contract', 'delivery_slip']
+DEMOS = ['invoice', 'contract', 'delivery_slip', 'certificate']
 GUIDES = [
     '03_creating-tables', '04_table-column-printing', '05_table-grouping', '07_sections', '08_expressions',
     '12_dynamic-columns', '13_multi-page-layout',
@@ -65,7 +66,20 @@ class ReportRenderTest:
         return self._test_data
 
     def _get_report(self) -> Report:
-        report = Report(report_definition=self._get_report_definition(), data=self._get_data(), is_test_data=True)
+        # allow usage of additional font 'tangerine'
+        fonts_dir = os.path.join('tests', 'fonts')
+        additional_fonts = [
+            dict(
+                value='tangerine',
+                filename=os.path.join(fonts_dir, 'tangerine.ttf'),
+                bold_filename=os.path.join(fonts_dir, 'tangerine-bold.ttf')
+            )
+        ]
+
+        report = Report(
+            report_definition=self._get_report_definition(), data=self._get_data(), is_test_data=True,
+            additional_fonts=additional_fonts
+        )
         report.set_creation_date('2023-03-23 10:01:24')
         return report
 
