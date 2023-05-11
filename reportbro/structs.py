@@ -203,10 +203,20 @@ class BorderStyle:
 
 
 class TextStyle(BorderStyle):
-    def __init__(self, data, key_prefix=''):
+    def __init__(self, data, key_prefix='', id_suffix=''):
+        """
+        :param data: dict containing text style values
+        :param key_prefix: optional prefix to access data values. this is used for conditional style
+        values where the values are stored within an element. The conditional style value keys contain
+        a prefix to distinguish them from the standard style values.
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        (conditional) styles stored within an element to avoid id collision with an existing style.
+        """
         BorderStyle.__init__(self, data, key_prefix)
         self.key_prefix = key_prefix
         self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
         self.bold = bool(data.get(key_prefix + 'bold'))
         self.italic = bool(data.get(key_prefix + 'italic'))
         self.underline = bool(data.get(key_prefix + 'underline'))
@@ -237,14 +247,6 @@ class TextStyle(BorderStyle):
         elif self.horizontal_alignment == HorizontalAlignment.justify:
             self.text_align = 'J'
         self.add_border_padding()
-
-    def set_bold(self, bold):
-        self.bold = bold
-        self.font_style = self.get_font_style(ignore_underline=True)
-
-    def set_italic(self, italic):
-        self.italic = italic
-        self.font_style = self.get_font_style(ignore_underline=True)
 
     def get_font_style(self, ignore_underline=False):
         font_style = ''

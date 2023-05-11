@@ -296,10 +296,10 @@ class TextElement(DocElement):
             style = report.styles.get(get_int_value(data, 'styleId'))
             if style is None:
                 raise ReportBroInternalError(f'Style for text element {self.id} not found')
-            # shallow copy is sufficient in our case
-            self.style = copy.copy(style)
+            self.style = style
         else:
-            self.style = TextStyle(data)
+            self.style = TextStyle(data, id_suffix='_text')
+
         self.print_if = get_str_value(data, 'printIf')
         self.pattern = get_str_value(data, 'pattern')
         self.link = get_str_value(data, 'link')
@@ -309,10 +309,9 @@ class TextElement(DocElement):
                 style = report.styles.get(int(data.get('cs_styleId')))
                 if style is None:
                     raise ReportBroInternalError(f'Conditional style for text element {self.id} not found')
-                # shallow copy is sufficient in our case
-                self.conditional_style = copy.copy(style)
+                self.conditional_style = style
             else:
-                self.conditional_style = TextStyle(data, key_prefix='cs_')
+                self.conditional_style = TextStyle(data, key_prefix='cs_', id_suffix='_text_cs')
         else:
             self.conditional_style = None
         # additional styles are used when text is rendered inside table row and
@@ -413,6 +412,8 @@ class TextElement(DocElement):
     def get_style(self, style_id, background_color, base_style):
         if style_id in self.additional_styles:
             return self.additional_styles[style_id]
+
+        # copy is needed because the background_color of the style is modified,
         # shallow copy is sufficient in our case
         style = copy.copy(base_style)
         style.id = style_id
