@@ -419,8 +419,7 @@ class FPDFRB(fpdf.FPDF):
         if additional_fonts:
             for additional_font in additional_fonts:
                 filename = additional_font.get('filename', '')
-                font = dict(
-                    standard_font=False, uni=additional_font.get('uni', True))
+                font = dict(standard_font=False)
 
                 regular_style = dict(
                     font_filename=filename, style='', font_added=False)
@@ -488,8 +487,7 @@ class FPDFRB(fpdf.FPDF):
                     style_font = font['style']
 
                 if not style_font['font_added']:
-                    self.add_font(
-                        family, style=style, fname=style_font['font_filename'], uni=font['uni'])
+                    self.add_font(family, style=style, fname=style_font['font_filename'])
                     style_font['font_added'] = True
 
             if underline:
