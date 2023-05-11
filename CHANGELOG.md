@@ -13,6 +13,7 @@
 
 ### Bug Fixes
 * Fix rendering of barcode and image inside section
+* Fix conditional style of text in xls export when style is directly set in text element
 
 ## [3.1.0] - 2023-04-19
 
