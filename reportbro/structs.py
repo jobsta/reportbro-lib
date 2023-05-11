@@ -1,3 +1,6 @@
+import json
+from typing import Optional
+
 from .enums import *
 from .errors import Error, ReportBroInternalError
 from .utils import get_float_value, get_int_value
@@ -38,7 +41,7 @@ class Color:
 
 
 class Parameter:
-    def __init__(self, report, data):
+    def __init__(self, report, data, init_test_data=False):
         self.report = report
         self.id = int(data.get('id'))
         self.name = data.get('name', '<unnamed>')
@@ -53,8 +56,16 @@ class Parameter:
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = (self.pattern.find('$') != -1)
         self.is_internal = self.name in ('page_count', 'page_number', 'row_number')
+        self.test_data = None
+        self.test_data_boolean = None
+        self.test_data_image = None
+        if init_test_data:
+            self.test_data = data.get('testData')
+            self.test_data_boolean = data.get('testDataBoolean')
+            self.test_data_image = data.get('testDataImage')
         self.range_stack = []
         self.children = []
+        self.show_only_name_type = bool(data.get('showOnlyNameType'))
         self.fields = dict()
         if self.type == ParameterType.array or self.type == ParameterType.map:
             for item in data.get('children'):
@@ -95,6 +106,89 @@ class Parameter:
 
     def has_range(self):
         return bool(self.range_stack)
+
+    def get_test_data(self) -> Optional[dict]:
+        """
+        Extract test data from test data value of parameters.
+
+        Supports test data saved in ReportBro Designer version >= 3.0.
+        The method is ported from the ReportBro Designer method ReportBro.getTestData
+
+        This is used for ReportBro tests where data is extracted from parameter test data
+        saved within the report template.
+        """
+        test_data = None
+        try:
+            test_data = json.loads(self.test_data)
+        except json.JSONDecodeError:
+            pass
+        if self.type == ParameterType.array or self.type == ParameterType.simple_array or\
+                self.type == ParameterType.map:
+            if test_data:
+                return self.get_parameter_test_data(self, test_data)
+        return None
+
+    @staticmethod
+    def get_parameter_test_data(parameter, test_data):
+        """
+        Get test data from parameter.
+
+        The method is ported from the ReportBro Designer method Parameter.getSanitizedTestData
+
+        :param parameter: parameter must be of type map, simple_array or array.
+        :param test_data: test data for parameter, must be a dict for parameter type map and a list otherwise.
+        :return: test data in a dict for parameter type map and list otherwise.
+        """
+        if parameter.type == ParameterType.map:
+            if not isinstance(test_data, dict):
+                test_data = {}
+            rv = Parameter.get_parameter_test_data_map(parameter, test_data)
+        elif parameter.type == ParameterType.simple_array:
+            rv = Parameter.get_parameter_test_data_simple_array(test_data)
+        elif parameter.type == ParameterType.array:
+            if not isinstance(test_data, list):
+                test_data = []
+            rv = []
+            for test_data_row in test_data:
+                if parameter.type == ParameterType.array:
+                    if not isinstance(test_data_row, dict):
+                        test_data_row = {}
+                    rv.append(Parameter.get_parameter_test_data_map(parameter, test_data_row))
+        else:
+            assert False
+        return rv
+
+    @staticmethod
+    def get_parameter_test_data_map(parameter, test_data):
+        """
+        The method is ported from the ReportBro Designer method Parameter.getSanitizedTestDataMap
+        """
+        rv = {}
+        for field in parameter.children:
+            if field.show_only_name_type:
+                continue
+            value = test_data[field.name] if (field.name in test_data) else None
+            if field.type == ParameterType.array or field.type == ParameterType.map:
+                rv[field.name] = Parameter.get_parameter_test_data(field, value)
+            elif field.type == ParameterType.simple_array:
+                rv[field.name] = Parameter.get_parameter_test_data_simple_array(value)
+            else:
+                rv[field.name] = value
+        return rv
+
+    @staticmethod
+    def get_parameter_test_data_simple_array(test_data):
+        """
+        The method is ported from the ReportBro Designer method Parameter.getSanitizedTestDataSimpleArray
+        """
+        test_data_rows = test_data
+        if not isinstance(test_data_rows, list):
+            test_data_rows = []
+        array_values = []
+        for test_data_row in test_data_rows:
+            if isinstance(test_data_row, dict) and 'data' in test_data_row:
+                array_values.append(test_data_row['data'])
+        return array_values
 
 
 class BorderStyle:
