@@ -38,6 +38,11 @@ class ImageElement(DocElement):
         self.image_key = None
         self.prepared_link = None
 
+    def is_printed(self, ctx):
+        if self.remove_empty_element and not self.image_key:
+            return False
+        return super().is_printed(ctx)
+
     def prepare(self, ctx, pdf_doc, only_verify):
         self.image_key = None
         # set image_key which is used to fetch cached images
@@ -55,13 +60,17 @@ class ImageElement(DocElement):
             else:
                 # static url
                 self.image_key = self.source
-        else:
+        elif self.image:
             # static image
             if self.image_filename:
                 self.image_key = self.image_filename
             else:
                 self.image_key = 'image_' + str(self.id)
-        self.report.load_image(self.image_key, ctx, self.id, self.source, self.image)
+
+        # only load image if available
+        if self.image_key:
+            self.report.load_image(self.image_key, ctx, self.id, self.source, self.image)
+
         if self.link:
             self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
             if not (self.prepared_link.startswith('http://') or self.prepared_link.startswith('https://')):
