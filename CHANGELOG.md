@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming Release
+## [3.2.0] - 2023-05-12
 
 ### Features
 * Support additional barcodes CODE39, EAN-8, EAN-13 and UPC
@@ -9,11 +9,11 @@
 ### Changes
 * Create barcodes as SVG to allow arbitrary barcode sizes and losless scaling
 * Raise error when there is not enough space to render CODE128 barcode
-* poetry >= 1.2.2 is required (poetry lock format v2 is used now)
 
 ### Bug Fixes
 * Fix rendering of barcode and image inside section
 * Fix conditional style of text in xls export when style is directly set in text element
+* Fix removing empty image element
 
 ## [3.1.0] - 2023-04-19
 
