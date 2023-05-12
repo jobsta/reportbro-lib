@@ -8,7 +8,7 @@ from pathlib import Path
 
 BASEDIR = Path(__file__).parent.resolve().joinpath(Path('data'))
 
-DEMOS = ['invoice', 'contract', 'delivery_slip', 'certificate']
+DEMOS = ['invoice', 'contract', 'delivery_slip']
 GUIDES = [
     '03_creating-tables', '04_table-column-printing', '05_table-grouping', '07_sections', '08_expressions',
     '12_dynamic-columns', '13_multi-page-layout',
