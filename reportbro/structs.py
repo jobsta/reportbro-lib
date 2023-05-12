@@ -253,6 +253,22 @@ class TextStyle(BorderStyle):
             self.text_align = 'J'
         self.add_border_padding()
 
+    def set_bold(self, bold):
+        """
+        Set bold style and update font_style member which is used for pdf rendering.
+        Method is used in rich text rendering.
+        """
+        self.bold = bold
+        self.font_style = self.get_font_style(ignore_underline=True)
+
+    def set_italic(self, italic):
+        """
+        Set italic style and update font_style member which is used for pdf rendering.
+        Method is used in rich text rendering.
+        """
+        self.italic = italic
+        self.font_style = self.get_font_style(ignore_underline=True)
+
     def get_font_style(self, ignore_underline=False):
         font_style = ''
         if self.bold:
