@@ -147,6 +147,10 @@ class BarCodeElement(DocElement):
         self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
         self.svg_data = None
+        if not self.rotate and self.height < 1:
+            raise ReportBroInternalError(f'invalid height for barcode element {self.id}', log_error=False)
+        elif self.rotate and self.width < 1:
+            raise ReportBroInternalError(f'invalid width for barcode element {self.id}', log_error=False)
         self.barcode_width = 0
         self.barcode_height = self.width if self.rotate else self.height
         if self.display_value:
