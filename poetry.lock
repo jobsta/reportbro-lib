@@ -399,13 +399,13 @@ test = ["coverage", "pytest"]
 
 [[package]]
 name = "reportbro-fpdf2"
-version = "2.7.1"
+version = "2.7.2"
 description = "Simple & fast PDF generation for Python"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "reportbro_fpdf2-2.7.1-py2.py3-none-any.whl", hash = "sha256:726ff26502bf12fa402fd6c39f28d93a14cae13daebef03e99f219acd108a01d"},
+    {file = "reportbro_fpdf2-2.7.2-py2.py3-none-any.whl", hash = "sha256:d2f755a8fc637f8a0fed85e18392500f6c23a92bedfd96bbc15e90f10946a259"},
 ]
 
 [package.dependencies]
@@ -479,4 +479,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "3af72b368d2ffbee947c1a93c23fbf18d8fd4d9c6ee47f3d9847b4fa694eb819"
+content-hash = "0e41f90fc8e2023bbff286a7cececf593973b752b76f08b222cb32ed62c55282"
