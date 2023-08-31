@@ -16,10 +16,11 @@ from .errors import Error, ReportBroError, ReportBroInternalError
 # the context_id (this is usually the data map but can be different for collection
 # parameters)
 ParameterRef = namedtuple('ParameterRef', ['parameter', 'data', 'data_context'])
-ContextEntry = namedtuple('ContextEntry', ['parameters', 'data', 'prev_entry'])
+ContextEntry = namedtuple('ContextEntry', ['parameters', 'data', 'data_source', 'prev_entry'])
 CONTEXT_ENTRY_PARAMETERS = 0
 CONTEXT_ENTRY_DATA = 1
-CONTEXT_ENTRY_PREV_ENTRY = 2
+CONTEXT_ENTRY_DATA_SOURCE = 2
+CONTEXT_ENTRY_PREV_ENTRY = 3
 
 
 class Context:
@@ -40,52 +41,71 @@ class Context:
         self.root_data = data
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0
-        self.context_stack: List[ContextEntry] = [ContextEntry(parameters=parameters, data=data, prev_entry=None)]
+        self.context_stack: List[ContextEntry] = [
+            ContextEntry(parameters=parameters, data=data, data_source=None, prev_entry=None)
+        ]
         # a range count is increased inside a table group band (e.g. to show header or sums for grouped rows),
         # if a range is set we have to evaluate parameter functions (e.g. sum/avg) because the range could be affected
         self.range_count = 0
 
-    def get_parameter(self, name):
+    def get_parameter(self, name, context_entry=None):
         """
         Return parameter reference for given parameter name.
 
         :param name: name of the parameter to find, the parameter can be present in the current
-        context or any of its parents.
+        context or any of its parents and can also contain a data source as prefix to specify a parameter
+        from outer scope.
+        :param context_entry: specific context of a data source in case data source is given
+        as prefix to parameter name.
         :return: parameter reference which contains a parameter instance and
         its data map referenced by the parameter. None if no parameter was found.
         """
-        if name.find('.') != -1:
-            # this parameter is part of a collection, so we first get the reference to the
-            # collection parameter and then return the parameter inside the collection, there can
-            # also be multiple nested levels of collections where each collection is referenced
-            # by a dot, e.g. "coll1.coll2.field"
+        colon_pos = name.find(':')
+        dot_pos = name.find('.')
+        if colon_pos != -1:
+            # this parameter belongs to a specific data source, therefor we first find the context
+            # for this data source and then search for the parameter specified after the data source,
+            # e.g. "contacts:name" -> search for context with data source "contacts" and within this
+            # context for the parameter "name". this makes it possible to reference parameters
+            # from outer scopes when there are mutliple nested levels.
+            data_source_name = name[:colon_pos]
+            for ds_context in reversed(self.context_stack):
+                data_source = ds_context[CONTEXT_ENTRY_DATA_SOURCE]
+                if data_source and data_source.name == data_source_name:
+                    return self.get_parameter(name=name[colon_pos + 1:], context_entry=ds_context)
+            return None
+        elif dot_pos != -1:
             name_parts = name.split('.')
-            collection_name = name_parts[0]
-            param_ref = self._get_parameter(collection_name)
-            if param_ref is not None and param_ref.parameter.type == ParameterType.map and\
-                    collection_name in param_ref.data:
+            parent_name = name_parts[0]
+            param_ref = self._get_parameter(parent_name, context_entry=context_entry)
+            if param_ref and param_ref.parameter.type == ParameterType.map and parent_name in param_ref.data:
+                # this parameter is part of a collection, so we first get the reference to the
+                # collection parameter and then return the parameter inside the collection, there can
+                # also be multiple nested levels of collections where each collection is referenced
+                # by a dot, e.g. "coll1.coll2.field"
                 parameter = param_ref.parameter
                 data = param_ref.data
                 while True:
-                    collection_name = name_parts[0]
+                    map_name = name_parts[0]
                     field_name = name_parts[1]
                     name_parts = name_parts[1:]
                     if len(name_parts) <= 1:
                         break
                     # nested map
-                    if field_name in parameter.fields and collection_name in data:
+                    if field_name in parameter.fields and map_name in data:
                         parameter = parameter.fields[field_name]
-                        data = data[collection_name] or dict()
+                        data = data[map_name] or dict()
+                        if parameter.type != ParameterType.map:
+                            return None
                     else:
                         return None
 
-                if field_name in parameter.fields and collection_name in data:
+                if field_name in parameter.fields and map_name in data:
                     return ParameterRef(
-                        parameter=parameter.fields[field_name], data=data[collection_name] or dict(),
-                        data_context=data)
+                        parameter=parameter.fields[field_name], data=data[map_name] or dict(), data_context=data)
             return None
         else:
-            return self._get_parameter(name)
+            return self._get_parameter(name, context_entry=context_entry)
 
     def _get_parameter(self, name, context_entry=None):
         if context_entry is None:
@@ -133,11 +153,12 @@ class Context:
             return param_ref.data_context['__context_id']
         return None
 
-    def push_context(self, parameters, data):
+    def push_context(self, parameters, data, data_source):
         self.id += 1
         data['__context_id'] = self.id
         current_context_entry = self.context_stack[-1]
-        self.context_stack.append(ContextEntry(parameters=parameters, data=data, prev_entry=current_context_entry))
+        self.context_stack.append(
+            ContextEntry(parameters=parameters, data=data, data_source=data_source, prev_entry=current_context_entry))
 
     def pop_context(self):
         if len(self.context_stack) <= 1:

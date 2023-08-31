@@ -956,7 +956,7 @@ class TableElement(DocElement):
             table_width_initialized = True
 
         if self.row_index < self.row_count:
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             for content_row in self.content_rows:
                 content_row.set_printed_cells(ctx)
                 if not table_width_initialized and not content_row.group_expression:
@@ -973,7 +973,7 @@ class TableElement(DocElement):
             self.row_index = 0
             while self.row_index < self.row_count:
                 # push data context of current row so values of current row can be accessed
-                ctx.push_context(self.row_parameters, self.rows[self.row_index])
+                ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
                 for content_row in self.content_rows:
                     content_row.prepare(ctx=ctx, row_index=self.row_index)
                 ctx.pop_context()
@@ -1005,7 +1005,7 @@ class TableElement(DocElement):
         first_row_on_page = True
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             self.content_row_index = 0
             for content_row in self.content_rows:
                 # in case we are on the first row of the page we have to check if the content row
@@ -1088,7 +1088,7 @@ class TableElement(DocElement):
                     content_group_rows.append(content_row)
 
             # set next group expr which is used for group expr of first row
-            ctx.push_context(self.row_parameters, self.rows[row_index])
+            ctx.push_context(self.row_parameters, self.rows[row_index], data_source=self.data_source_parameter)
             for content_group_row in content_group_rows:
                 content_group_row.set_next_group_expression(ctx)
             ctx.pop_context()
@@ -1097,7 +1097,8 @@ class TableElement(DocElement):
                 has_next = (row_index + 1) < self.row_count
                 # set context for next row (if available) so group expr of next row can be evaluated
                 if has_next:
-                    ctx.push_context(self.row_parameters, self.rows[row_index + 1])
+                    ctx.push_context(
+                        self.row_parameters, self.rows[row_index + 1], data_source=self.data_source_parameter)
                 for content_group_row in content_group_rows:
                     # set group expression for next row so the group expressions for previous, next and current
                     # row are available
@@ -1133,7 +1134,7 @@ class TableElement(DocElement):
 
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             for i, content_row in enumerate(self.content_rows):
                 content_row.prepare(ctx=ctx, row_index=self.row_index)
                 if content_row.is_printed(ctx=ctx):
@@ -1644,6 +1645,7 @@ class SectionElement(DocElement):
         # always remove section (clear space for following elements) if not printed due to print_if condition
         self.remove_empty_element = True
         self.spreadsheet_hide = False
+        self.data_source_parameter = None
 
         header = bool(data.get('header'))
         footer = bool(data.get('footer'))
@@ -1678,11 +1680,11 @@ class SectionElement(DocElement):
         if param_ref is None:
             raise ReportBroError(
                 Error('errorMsgMissingDataSourceParameter', object_id=self.id, field='dataSource'))
-        data_source_parameter = param_ref.parameter
-        if data_source_parameter.type != ParameterType.array:
+        self.data_source_parameter = param_ref.parameter
+        if self.data_source_parameter.type != ParameterType.array:
             raise ReportBroError(
                 Error('errorMsgInvalidDataSourceParameter', object_id=self.id, field='dataSource'))
-        for row_parameter in data_source_parameter.children:
+        for row_parameter in self.data_source_parameter.children:
             self.row_parameters[row_parameter.name] = row_parameter
         self.rows, parameter_exists = ctx.get_parameter_data(param_ref)
         if not parameter_exists:
@@ -1700,7 +1702,7 @@ class SectionElement(DocElement):
                 self.header.prepare(ctx, pdf_doc=None, only_verify=True)
             while self.row_index < self.row_count:
                 # push data context of current row so values of current row can be accessed
-                ctx.push_context(self.row_parameters, self.rows[self.row_index])
+                ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
                 self.content.prepare(ctx, pdf_doc=None, only_verify=True)
                 ctx.pop_context()
                 self.row_index += 1
@@ -1722,7 +1724,7 @@ class SectionElement(DocElement):
 
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             self.content.create_render_elements(
                 offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
             ctx.pop_context()
@@ -1758,7 +1760,7 @@ class SectionElement(DocElement):
 
         while self.row_index < self.row_count:
             # push data context of current row so values of current row can be accessed
-            ctx.push_context(self.row_parameters, self.rows[self.row_index])
+            ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             self.content.container.prepare(ctx, pdf_doc=None)
             row, _ = self.content.container.render_spreadsheet(row, col, ctx, renderer)
             self.row_index += 1

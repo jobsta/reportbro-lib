@@ -865,7 +865,7 @@ class Report:
                                     row_parameters[row_parameter.name] = row_parameter
 
                                 for row in rows:
-                                    self.context.push_context(row_parameters, row)
+                                    self.context.push_context(row_parameters, row, data_source=param_ref.parameter)
                                     for field in eval_fields:
                                         self.evaluate_parameter_expr(field, row)
                                     self.context.pop_context()
