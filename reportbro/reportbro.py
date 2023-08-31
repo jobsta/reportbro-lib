@@ -557,6 +557,8 @@ class Report:
         if request_headers is not None:
             self.request_headers = request_headers
 
+        self.images = dict()  # cached image data
+
         version = report_definition.get('version')
         if isinstance(version, int):
             # convert old report definitions
@@ -579,48 +581,49 @@ class Report:
             style_id = int(item.get('id'))
             self.styles[style_id] = style
 
-        for doc_element in report_definition.get('docElements'):
-            element_type = DocElementType[doc_element.get('elementType')]
-            container_id = str(doc_element.get('containerId'))
-            container = None
-            if container_id:
-                container = self.containers.get(container_id)
-            elem = None
-            if element_type == DocElementType.text:
-                elem = TextElement(self, doc_element)
-            elif element_type == DocElementType.line:
-                elem = LineElement(self, doc_element)
-            elif element_type == DocElementType.image:
-                elem = ImageElement(self, doc_element)
-            elif element_type == DocElementType.bar_code:
-                elem = BarCodeElement(self, doc_element)
-            elif element_type == DocElementType.table:
-                elem = TableElement(self, doc_element)
-            elif element_type == DocElementType.page_break:
-                elem = PageBreakElement(self, doc_element)
-            elif element_type == DocElementType.frame:
-                elem = FrameElement(self, doc_element, self.containers)
-            elif element_type == DocElementType.section:
-                elem = SectionElement(self, doc_element, self.containers)
+        # do not init elements in case of existing errors as this could cause an exception
+        # (e.g. wrong parameter value type in case of duplicate parameter)
+        if not self.errors:
+            for doc_element in report_definition.get('docElements'):
+                element_type = DocElementType[doc_element.get('elementType')]
+                container_id = str(doc_element.get('containerId'))
+                container = None
+                if container_id:
+                    container = self.containers.get(container_id)
+                elem = None
+                if element_type == DocElementType.text:
+                    elem = TextElement(self, doc_element)
+                elif element_type == DocElementType.line:
+                    elem = LineElement(self, doc_element)
+                elif element_type == DocElementType.image:
+                    elem = ImageElement(self, doc_element)
+                elif element_type == DocElementType.bar_code:
+                    elem = BarCodeElement(self, doc_element)
+                elif element_type == DocElementType.table:
+                    elem = TableElement(self, doc_element)
+                elif element_type == DocElementType.page_break:
+                    elem = PageBreakElement(self, doc_element)
+                elif element_type == DocElementType.frame:
+                    elem = FrameElement(self, doc_element, self.containers)
+                elif element_type == DocElementType.section:
+                    elem = SectionElement(self, doc_element, self.containers)
 
-            if elem and container:
-                if container.is_visible():
-                    if elem.x < 0:
-                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='x'))
-                    elif elem.x + elem.width > container.width:
-                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='width'))
-                    if elem.y < 0:
-                        self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='y'))
-                    elif elem.y + elem.height > container.height:
-                        self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='height'))
-                container.add(elem)
+                if elem and container:
+                    if container.is_visible():
+                        if elem.x < 0:
+                            self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='x'))
+                        elif elem.x + elem.width > container.width:
+                            self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='width'))
+                        if elem.y < 0:
+                            self.errors.append(Error('errorMsgInvalidPosition', object_id=elem.id, field='y'))
+                        elif elem.y + elem.height > container.height:
+                            self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='height'))
+                    container.add(elem)
 
-        self.context = Context(self, self.parameters, self.data)
+            self.context = Context(self, self.parameters, self.data)
+            self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
+                              is_test_data=is_test_data, parents=[])
 
-        self.images = dict()  # cached image data
-
-        self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
-                          is_test_data=is_test_data, parents=[])
         try:
             if not self.errors:
                 self.evaluate_parameters(parameter_list, self.data)
