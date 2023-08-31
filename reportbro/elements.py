@@ -1641,6 +1641,8 @@ class SectionElement(DocElement):
         DocElement.__init__(self, report, data)
         self.data_source = get_str_value(data, 'dataSource')
         self.print_if = get_str_value(data, 'printIf')
+        # always remove section (clear space for following elements) if not printed due to print_if condition
+        self.remove_empty_element = True
         self.spreadsheet_hide = False
 
         header = bool(data.get('header'))
