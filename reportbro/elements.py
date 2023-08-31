@@ -834,9 +834,11 @@ class TableElement(DocElement):
         content_data_rows = data.get('contentDataRows')
         assert isinstance(content_data_rows, list)
         main_content_created = False
+        data_source_available = bool(self.data_source.strip())
         for idx, content_data_row in enumerate(content_data_rows):
             band_element = TableBandElement(
-                report, content_data_row, BandType.content, before_group=not main_content_created)
+                report, content_data_row, BandType.content,
+                data_source_available=data_source_available, before_group=not main_content_created)
 
             if band_element.group_expression:
                 self.has_table_band_group = True
@@ -1157,7 +1159,7 @@ class TableElement(DocElement):
 
 
 class TableBandElement(object):
-    def __init__(self, report, data, band_type, before_group=False):
+    def __init__(self, report, data, band_type, data_source_available=False, before_group=False):
         from .containers import Container
         assert(isinstance(data, dict))
         self.id = get_int_value(data, 'id')
@@ -1168,21 +1170,26 @@ class TableBandElement(object):
         else:
             self.repeat_header = None
         self.background_color = Color(data.get('backgroundColor'))
-        self.group_expression = get_str_value(data, 'groupExpression')
         self.print_if = get_str_value(data, 'printIf')
         self.before_group = before_group
         self.page_break = False
         self.repeat_group_header = None
         if band_type == BandType.content:
+            self.group_expression = get_str_value(data, 'groupExpression')
             self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
             self.always_print_on_same_page = bool(data.get('alwaysPrintOnSamePage'))
             if self.group_expression:
+                if not data_source_available:
+                    report.errors.append(Error(
+                        'errorMsgGroupExpressionWithoutDataSource', object_id=self.id, field='groupExpression'))
+
                 self.page_break = bool(data.get('pageBreak'))
                 self.repeat_group_header = bool(data.get('repeatGroupHeader'))
                 if self.repeat_group_header and not before_group:
                     report.errors.append(Error(
                         'errorMsgRepeatGroupHeaderAfterContent', object_id=self.id, field='repeatGroupHeader'))
         else:
+            self.group_expression = None
             self.alternate_background_color = None
             self.always_print_on_same_page = True
         self.cells = []  # cells created from initial data as defined in Designer
