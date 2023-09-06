@@ -369,7 +369,7 @@ class TextElement(DocElement):
             if self.eval:
                 content = ctx.evaluate_expression(self.content, self.id, field='content')
                 if self.pattern:
-                    if isinstance(content, (int, float, decimal.Decimal)):
+                    if type(content) in (int, float, decimal.Decimal):
                         try:
                             content = format_decimal(content, self.pattern, locale=ctx.pattern_locale)
                             if self.pattern.find('$') != -1:
