@@ -6,6 +6,7 @@ from io import BytesIO
 import copy
 import datetime
 import decimal
+import json
 import PIL
 import qrcode
 import qrcode.image.svg
@@ -16,7 +17,7 @@ from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
 from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
-from .structs import Color, BorderStyle, TextStyle
+from .structs import BorderStyle, Color, ConditionalStyleRule, TextStyle
 from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
 
 
@@ -316,6 +317,7 @@ class TextElement(DocElement):
         self.print_if = get_str_value(data, 'printIf')
         self.pattern = get_str_value(data, 'pattern')
         self.link = get_str_value(data, 'link')
+        self.cs_additional_rules = []
         self.cs_condition = get_str_value(data, 'cs_condition')
         if self.cs_condition:
             if data.get('cs_styleId'):
@@ -325,6 +327,16 @@ class TextElement(DocElement):
                 self.conditional_style = style
             else:
                 self.conditional_style = TextStyle(data, key_prefix='cs_', id_suffix='_text_cs')
+
+            if data.get('cs_additionalRules'):
+                try:
+                    additional_rules = json.loads(data.get('cs_additionalRules'))
+                    for rule_nr, additional_rule in enumerate(additional_rules, start=1):
+                        self.cs_additional_rules.append(
+                            ConditionalStyleRule(report, additional_rule, object_id=self.id, rule_nr=rule_nr))
+                except (json.JSONDecodeError, TypeError):
+                    raise ReportBroInternalError(
+                        f'Invalid additional rules for text element {self.id}', log_error=False)
         else:
             self.conditional_style = None
         # additional styles are used when text is rendered inside table row and
@@ -398,6 +410,11 @@ class TextElement(DocElement):
         if self.cs_condition:
             if ctx.evaluate_expression(self.cs_condition, self.id, field='cs_condition'):
                 self.used_style = self.conditional_style
+                if self.cs_additional_rules:
+                    for cs_rule in self.cs_additional_rules:
+                        if cs_rule.is_true(ctx=ctx, object_id=self.id):
+                            self.used_style = cs_rule.style
+                            break
             else:
                 self.used_style = self.style
         else:

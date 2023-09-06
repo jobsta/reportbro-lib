@@ -288,3 +288,21 @@ class TextStyle(BorderStyle):
             self.padding_right += self.border_width
         if self.border_bottom:
             self.padding_bottom += self.border_width
+
+
+class ConditionalStyleRule:
+    def __init__(self, report, data, object_id, rule_nr):
+        self.report = report
+        self.condition = data['condition']
+        self.style = None
+        if not data.get('style_id'):
+            self.report.errors.append(
+                Error('errorMsgAddtionalRulesNoStyleSelected',
+                      object_id=object_id, field='cs_additionalRules', info=str(rule_nr)))
+        else:
+            self.style = report.styles.get(int(data.get('style_id')))
+            if self.style is None:
+                raise ReportBroInternalError(f'Conditional style for element {object_id} not found', log_error=False)
+
+    def is_true(self, ctx, object_id):
+        return ctx.evaluate_expression(self.condition, object_id, field='cs_additionalRules')
