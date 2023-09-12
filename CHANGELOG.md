@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.0] - 2023-09-12
+
+### Features
+* Support multiple conditional styles
+
+### Changes
+* Support data source prefix for parameter to access parameter from outer scope
+
+### Bug Fixes
+* Always remove section (clear space for following elements) if not printed due to "Print If" condition
+* Fix showing error in case of duplicate parameter name
+* Fix error when formatting decimal by using an invalid bool value
+* Do not return error if evaluated parameter expression is None for "Nullable" parameter
+
 ## [3.2.1] - 2023-05-17
 
 ### Changes
