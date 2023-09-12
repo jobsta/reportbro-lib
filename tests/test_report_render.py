@@ -119,6 +119,7 @@ class ReportRenderTest:
     def update_report_output(self, update_file=True, update_checksum=False):
         for format_type in ReportRenderTest.formats:
             report = self._get_report()
+            assert len(report.errors) == 0
             generate_function = report.__getattribute__(f'generate_{format_type}')
             report_data = generate_function()
             if update_checksum:
