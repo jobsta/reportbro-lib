@@ -884,7 +884,10 @@ class Report:
             value = self.context.evaluate_expression(
                 parameter.expression, parameter.id, field='expression')
             valid_value = False
-            if parameter_type == ParameterType.string:
+            if value is None and parameter.nullable:
+                # value is valid if expression evaluates to None and parameter is nullable
+                valid_value = True
+            elif parameter_type == ParameterType.string:
                 if isinstance(value, str):
                     valid_value = True
             elif parameter_type == ParameterType.number:
