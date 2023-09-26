@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.3.1] - 2023-09-26
+
+### Bug Fixes
+* Avoid error if barcode parameter data is empty
+
 ## [3.3.0] - 2023-09-12
 
 ### Features
