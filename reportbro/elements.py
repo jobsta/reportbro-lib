@@ -160,7 +160,7 @@ class BarCodeElement(DocElement):
         self.prepared_content = None
 
     def is_printed(self, ctx):
-        if not self.content:
+        if not self.prepared_content:
             return False
         return DocElementBase.is_printed(self, ctx)
 
