@@ -926,3 +926,32 @@ class Report:
 
     def set_creation_date(self, creation_date):
         self.creation_date = parse_datetime_string(creation_date)
+
+    @staticmethod
+    def get_test_data(parameter_list):
+        """
+        Extract test data from parameters.
+
+        Supports test data saved in ReportBro Designer version >= 3.0.
+
+        This is used for ReportBro tests where data is extracted from parameter test data
+        saved within the report template.
+
+        :param parameter_list: list of parameters (each entry is a dict containing parameter data)
+        :return: dict which contains name of all parameters and their test values
+        """
+        rv = {}
+        for parameter_data in parameter_list:
+            parameter = Parameter(report=None, data=parameter_data, init_test_data=True)
+            if not parameter.show_only_name_type:
+                if parameter.type == ParameterType.array or parameter.type == ParameterType.simple_array or\
+                        parameter.type == ParameterType.map:
+                    rv[parameter.name] = parameter.get_test_data()
+                elif parameter.type == ParameterType.string or parameter.type == ParameterType.number or\
+                        parameter.type == ParameterType.date:
+                    rv[parameter.name] = parameter.test_data
+                elif parameter.type == ParameterType.boolean:
+                    rv[parameter.name] = parameter.test_data_boolean
+                elif parameter.type == ParameterType.image:
+                    rv[parameter.name] = parameter.test_data_image
+        return rv

@@ -2,7 +2,6 @@ import pytest
 import json
 import os
 from reportbro import Report
-from reportbro.structs import Parameter, ParameterType
 from hashlib import sha256
 from pathlib import Path
 
@@ -24,24 +23,6 @@ class ReportRenderTest:
         self._test_data = None
         self._report_definition = None
 
-    @staticmethod
-    def get_test_data(parameter_list):
-        rv = {}
-        for parameter_data in parameter_list:
-            parameter = Parameter(report=None, data=parameter_data, init_test_data=True)
-            if not parameter.show_only_name_type:
-                if parameter.type == ParameterType.array or parameter.type == ParameterType.simple_array or\
-                        parameter.type == ParameterType.map:
-                    rv[parameter.name] = parameter.get_test_data()
-                elif parameter.type == ParameterType.string or parameter.type == ParameterType.number or\
-                        parameter.type == ParameterType.date:
-                    rv[parameter.name] = parameter.test_data
-                elif parameter.type == ParameterType.boolean:
-                    rv[parameter.name] = parameter.test_data_boolean
-                elif parameter.type == ParameterType.image:
-                    rv[parameter.name] = parameter.test_data_image
-        return rv
-
     def _get_report_definition(self) -> dict:
         if not self._report_definition:
             report_file = self.base_dir.joinpath(Path(f'{self.name}.json'))
@@ -62,7 +43,7 @@ class ReportRenderTest:
                 parameter_key = 'parameters'
                 if parameter_key not in report_definition:
                     pytest.fail('No data for report creation')
-                self._test_data = self.get_test_data(report_definition[parameter_key])
+                self._test_data = Report.get_test_data(report_definition[parameter_key])
         return self._test_data
 
     def _get_report(self) -> Report:
