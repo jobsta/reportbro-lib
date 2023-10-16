@@ -86,30 +86,32 @@ class ImageElement(DocElement):
         return ImageRenderElement(self.report, offset_y, self), True
 
     def render_spreadsheet(self, row, col, ctx, renderer):
+        if self.spreadsheet_column:
+            col = self.spreadsheet_column - 1
+
         if self.image_key:
             image = self.report.get_image(self.image_key)
-            if self.spreadsheet_column:
-                col = self.spreadsheet_column - 1
+            if image and image.image_data:
+                try:
+                    raw_image = PIL.Image.open(image.image_data)
+                except Exception as ex:
+                    raise ReportBroError(
+                        Error('errorMsgLoadingImageFailed', object_id=self.id,
+                              field='source' if self.source else 'image', info=str(ex)))
 
-            try:
-                raw_image = PIL.Image.open(image.image_data)
-            except Exception as ex:
-                raise ReportBroError(
-                    Error('errorMsgLoadingImageFailed', object_id=self.id,
-                          field='source' if self.source else 'image', info=str(ex)))
+                image_display_width, image_display_height = get_image_display_size(
+                    self.width, self.height, raw_image.width, raw_image.height)
+                if image_display_width != raw_image.width or image_display_height != raw_image.height:
+                    raw_image = raw_image.resize(
+                        (int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
+                    image.image_data = BytesIO()
+                    raw_image.save(image.image_data, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
 
-            image_display_width, image_display_height = get_image_display_size(
-                self.width, self.height, raw_image.width, raw_image.height)
-            if image_display_width != raw_image.width or image_display_height != raw_image.height:
-                raw_image = raw_image.resize(
-                    (int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
-                image.image_data = BytesIO()
-                raw_image.save(image.image_data, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
+                renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_data,
+                                      width=self.width, url=self.prepared_link)
 
-            renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_data,
-                                  width=self.width, url=self.prepared_link)
-            row += 2 if self.spreadsheet_add_empty_row else 1
-            col += 1
+        row += 2 if self.spreadsheet_add_empty_row else 1
+        col += 1
         return row, col
 
 
