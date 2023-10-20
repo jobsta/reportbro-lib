@@ -19,11 +19,13 @@ import importlib.resources
 import re
 import os
 import urllib
+import urllib.parse
 import xlsxwriter
 from copy import deepcopy
 from babel import Locale
-from io import BufferedReader, IOBase
 from datetime import datetime
+from io import BufferedReader, IOBase
+from urllib import request
 
 from .containers import ReportBand
 from .elements import *
@@ -137,13 +139,13 @@ class DocumentPDFRenderer:
 
 
 class DocumentXLSXRenderer:
-    def __init__(self, header_band, content_band, footer_band, report, context, filename):
+    def __init__(self, header_band, content_band, footer_band, report, context, filename, options):
         self.header_band = header_band
         self.content_band = content_band
         self.footer_band = footer_band
         self.document_properties = report.document_properties
         self.workbook_mem = BytesIO()
-        self.workbook = xlsxwriter.Workbook(filename if filename else self.workbook_mem)
+        self.workbook = xlsxwriter.Workbook(filename if filename else self.workbook_mem, options)
         if report.creation_date:
             self.workbook.set_properties({'created': report.creation_date})
         self.worksheet = self.workbook.add_worksheet()
@@ -307,7 +309,8 @@ class DocumentProperties:
 
 
 class ImageData:
-    def __init__(self, ctx, image_id, source, image_file, is_test_data, headers):
+    def __init__(self, ctx, image_id, source, image_file, is_test_data, headers,
+                 allow_local_image, allow_external_image):
         self.image_data = None
         self.image_type = None
         image_uri = None  # can be either url or file path
@@ -374,18 +377,26 @@ class ImageData:
                     Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
 
         if self.image_type is not None:
-            if self.image_type not in ('png', 'jpg', 'jpeg'):
+            if self.image_type not in ('png', 'jpg', 'jpeg', 'webp'):
                 raise ReportBroError(
                     Error('errorMsgUnsupportedImageType', object_id=image_id, field='source'))
 
         if image_url:
+            if not allow_external_image:
+                raise ReportBroError(
+                    Error('errorMsgExternalImageNotAllowed', object_id=image_id, field='source'))
+
             try:
-                req = urllib.request.Request(image_url, headers=headers)
-                self.image_data = BytesIO(urllib.request.urlopen(req).read())
+                req = request.Request(image_url, headers=headers)
+                self.image_data = BytesIO(request.urlopen(req).read())
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
         elif image_path:
+            if not allow_local_image:
+                raise ReportBroError(
+                    Error('errorMsgLocalImageNotAllowed', object_id=image_id, field='source'))
+
             try:
                 cwd = os.getcwd()
                 image_path = os.path.abspath(image_path)
@@ -501,7 +512,8 @@ class FPDFRB(fpdf.FPDF):
 class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,
                  page_limit=10000, request_headers=None, encode_error_handling='strict',
-                 core_fonts_encoding='windows-1252'):
+                 core_fonts_encoding='windows-1252', spreadsheet_options=None,
+                 allow_local_image=True, allow_external_image=False):
         """Create Report instance which can then be used to generate pdf and xlsx reports.
 
         :param report_definition: The report object containg report elements, parameters,
@@ -528,6 +540,16 @@ class Report:
         :param core_fonts_encoding: defines the encoding when using the core fonts.
         Default is 'windows-1252' which is usually the best choice for English and many European
         languages including Spanish, French, and German.
+        :param spreadsheet_options: options to change default conversion for string content in spreadsheet.
+        The dict parameter can contain the following keys:
+        - 'strings_to_numbers': enable converting strings to numbers. Default is False.
+        - 'strings_to_formulas': enable converting strings to formulas. Default is True.
+        - 'strings_to_urls': enable converting strings to urls. Default is True.
+        :param allow_local_image: If set to True an image source can contain a relative path to an image
+        file on the local file system. If set to False an error is thrown in case a path is specified for an image.
+        :param allow_external_image: If set to True an image source can contain an external url. The image will be
+        downloaded on the fly when rendering the spreadsheet. If set to False an error is thrown
+        in case an url is specified for an image.
         """
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
@@ -556,6 +578,9 @@ class Report:
         self.request_headers = {'User-Agent': 'Mozilla/5.0'}
         if request_headers is not None:
             self.request_headers = request_headers
+        self.spreedsheet_options = spreadsheet_options or dict()
+        self.allow_local_image = allow_local_image
+        self.allow_external_image = allow_external_image
 
         self.images = dict()  # cached image data
 
@@ -635,7 +660,9 @@ class Report:
     def load_image(self, image_key, ctx, image_id, source, image_file):
         # test if image is not already loaded into image cache
         if image_key not in self.images:
-            image = ImageData(ctx, image_id, source, image_file, self.is_test_data, headers=self.request_headers)
+            image = ImageData(
+                ctx, image_id, source, image_file, self.is_test_data, headers=self.request_headers,
+                allow_local_image=self.allow_local_image, allow_external_image=self.allow_external_image)
             self.images[image_key] = image
 
     def get_image(self, image_key):
@@ -650,9 +677,13 @@ class Report:
         return renderer.render()
 
     def generate_xlsx(self, filename=''):
+        options = dict()
+        options['strings_to_numbers'] = self.spreedsheet_options.get('strings_to_numbers', False)
+        options['strings_to_formulas'] = self.spreedsheet_options.get('strings_to_formulas', True)
+        options['strings_to_urls'] = self.spreedsheet_options.get('strings_to_urls', True)
         renderer = DocumentXLSXRenderer(
             header_band=self.header, content_band=self.content, footer_band=self.footer,
-            report=self, context=self.context, filename=filename)
+            report=self, context=self.context, filename=filename, options=options)
         return renderer.render()
 
     # goes through all elements in header, content and footer and throws a ReportBroError in case
