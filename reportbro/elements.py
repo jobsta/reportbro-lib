@@ -8,6 +8,7 @@ import datetime
 import decimal
 import json
 import PIL
+import PIL.Image
 import qrcode
 import qrcode.image.svg
 
