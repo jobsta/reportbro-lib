@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.4.0] - 2023-10-23
+
+### Changes
+* Add spreadsheet options parameter to change default conversion of string content 
+* Add static method to extract test data from parameters
+* Support webp image format
+* Add report instance settings "allow_local_image" and "allow_external_image" to define
+if local images (from filesystem) and external images (referenced with link) are allowed
+
+### Bug Fixes
+* Fix error when rendering spreadsheet with empty image
+
 ## [3.3.1] - 2023-09-26
 
 ### Bug Fixes
