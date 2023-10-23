@@ -365,3 +365,6 @@ class Context:
 
     def set_page_count(self, page_count):
         self.root_data['page_count'] = page_count
+
+    def get_page_count(self):
+        return self.root_data['page_count']

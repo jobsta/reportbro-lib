@@ -54,11 +54,15 @@ class DocumentPDFRenderer:
         self.filename = filename
         self.add_watermark = add_watermark
         self.page_limit = page_limit
+        self.page_count = 0
         self.creation_date = report.creation_date
 
     def add_page(self):
         self.pdf_doc.add_page()
         self.context.inc_page_number()
+
+    def get_page_count(self):
+        return self.context.get_page_count()
 
     def is_finished(self):
         return self.content_band.is_finished()
@@ -563,6 +567,7 @@ class Report:
         self.header = ReportBand(BandType.header, '0_header', self.containers, self)
         self.content = ReportBand(BandType.content, '0_content', self.containers, self)
         self.footer = ReportBand(BandType.footer, '0_footer', self.containers, self)
+        self.page_count = 0
 
         self.parameters = dict()
         self.styles = dict()
@@ -674,7 +679,9 @@ class Report:
             report=self, context=self.context, additional_fonts=self.additional_fonts,
             filename=filename, add_watermark=add_watermark, page_limit=self.page_limit,
             encode_error_handling=self.encode_error_handling, core_fonts_encoding=self.core_fonts_encoding)
-        return renderer.render()
+        rv = renderer.render()
+        self.page_count = renderer.get_page_count()
+        return rv
 
     def generate_xlsx(self, filename=''):
         options = dict()
@@ -954,6 +961,9 @@ class Report:
                 dest_data[parameter.name] = value
             else:
                 data[parameter.name] = value
+
+    def get_page_count(self):
+        return self.page_count
 
     def set_creation_date(self, creation_date):
         self.creation_date = parse_datetime_string(creation_date)
