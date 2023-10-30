@@ -849,6 +849,8 @@ class Report:
                                 'errorMsgInvalidArray',
                                 object_id=parameter.id, field=field, context=parameter.name))
                     elif parameter_type == ParameterType.map:
+                        if value is None and not parameter.nullable:
+                            value = dict()
                         if isinstance(value, dict):
                             if isinstance(parameter.children, list):
                                 parents.append(parameter)
@@ -865,8 +867,6 @@ class Report:
                                     'errorMsgInvalidMap',
                                     object_id=parameter.id, field='type', context=parameter.name))
                         elif value is None:
-                            if not parameter.nullable:
-                                value = dict()
                             dest_data[parameter.name] = value
                         else:
                             self.errors.append(Error(
