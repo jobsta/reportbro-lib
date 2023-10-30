@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Optional, Union
 
 from .enums import *
 from .errors import Error, ReportBroInternalError
@@ -107,7 +107,7 @@ class Parameter:
     def has_range(self):
         return bool(self.range_stack)
 
-    def get_test_data(self) -> Optional[dict]:
+    def get_test_data(self) -> Optional[Union[dict, list]]:
         """
         Extract test data from test data value of parameters.
 
@@ -122,10 +122,15 @@ class Parameter:
             test_data = json.loads(self.test_data)
         except json.JSONDecodeError:
             pass
-        if self.type == ParameterType.array or self.type == ParameterType.simple_array or\
-                self.type == ParameterType.map:
+        if self.type in (ParameterType.array, ParameterType.simple_array, ParameterType.map):
             if test_data:
                 return self.get_parameter_test_data(self, test_data)
+            else:
+                if self.type == ParameterType.map:
+                    return {}
+                else:
+                    # array or simple_array
+                    return []
         return None
 
     @staticmethod
