@@ -68,6 +68,12 @@ class Context:
             # e.g. "contacts:name" -> search for context with data source "contacts" and within this
             # context for the parameter "name". this makes it possible to reference parameters
             # from outer scopes when there are mutliple nested levels.
+
+            # if no data source is specified then the parameter belongs to the root context,
+            # e.g. ":address" -> search for parameter "address" in root parameters.
+            if colon_pos == 0:
+                return self.get_parameter(name=name[1:], context_entry=self.context_stack[0])
+
             data_source_name = name[:colon_pos]
             for ds_context in reversed(self.context_stack):
                 data_source = ds_context[CONTEXT_ENTRY_DATA_SOURCE]
