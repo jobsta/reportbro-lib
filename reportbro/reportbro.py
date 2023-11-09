@@ -703,7 +703,7 @@ class Report:
             self.footer.prepare(self.context, only_verify=True)
 
     def parse_parameter_value(self, parameter, parent_id, is_test_data, parameter_type, value):
-        error_field = 'test_data' if is_test_data else 'type'
+        error_field = 'testData' if is_test_data else 'type'
         if parameter_type == ParameterType.string:
             if value is not None:
                 if not isinstance(value, str):
@@ -720,7 +720,7 @@ class Report:
                     value = decimal.Decimal(str(value))
                 except (decimal.InvalidOperation, TypeError):
                     if parent_id and is_test_data:
-                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='testData'))
                         self.errors.append(Error('errorMsgInvalidNumber', object_id=parameter.id, field='type'))
                     else:
                         self.errors.append(Error('errorMsgInvalidNumber',
@@ -732,7 +732,7 @@ class Report:
                     value = None if parameter.nullable else decimal.Decimal(0)
                 elif not isinstance(value, decimal.Decimal):
                     if parent_id and is_test_data:
-                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                        self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='testData'))
                         self.errors.append(Error('errorMsgInvalidNumber', object_id=parameter.id, field='type'))
                     else:
                         self.errors.append(Error('errorMsgInvalidNumber',
@@ -755,7 +755,7 @@ class Report:
                         value = parse_datetime_string(value)
                     except (ValueError, TypeError):
                         if parent_id and is_test_data:
-                            self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                            self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='testData'))
                             self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field='type'))
                         else:
                             self.errors.append(Error('errorMsgInvalidDate',
@@ -765,7 +765,7 @@ class Report:
                     value = datetime.datetime(value.year, value.month, value.day)
             elif value is not None:
                 if parent_id and is_test_data:
-                    self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='test_data'))
+                    self.errors.append(Error('errorMsgInvalidTestData', object_id=parent_id, field='testData'))
                     self.errors.append(Error('errorMsgInvalidDate', object_id=parameter.id, field='type'))
                 else:
                     self.errors.append(Error('errorMsgInvalidDate',
@@ -775,7 +775,7 @@ class Report:
         return value
 
     def process_data(self, dest_data, src_data, parameters, is_test_data, parents):
-        field = 'test_data' if is_test_data else 'type'
+        field = 'testData' if is_test_data else 'type'
         parent_id = parents[-1].id if parents else None
         for parameter in parameters:
             if parameter.is_internal:
@@ -871,7 +871,7 @@ class Report:
                         else:
                             self.errors.append(Error(
                                 'errorMsgInvalidMap',
-                                object_id=parameter.id, field='type', context=parameter.name))
+                                object_id=parameter.id, field=field, context=parameter.name))
                 else:
                     # nested parameters (array / map inside other array / map parameter) are only
                     # supported in PLUS version
