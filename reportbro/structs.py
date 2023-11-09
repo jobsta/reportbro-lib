@@ -71,8 +71,10 @@ class Parameter:
             for item in data.get('children'):
                 parameter = Parameter(self.report, item)
                 if parameter.name in self.fields:
-                    self.report.errors.append(
-                        Error('errorMsgDuplicateParameterField', object_id=parameter.id, field='name'))
+                    # report instance can be null when test data is retrieved from parameters
+                    if self.report:
+                        self.report.errors.append(
+                            Error('errorMsgDuplicateParameterField', object_id=parameter.id, field='name'))
                 else:
                     self.children.append(parameter)
                     self.fields[parameter.name] = parameter
@@ -183,7 +185,16 @@ class Parameter:
                 else:
                     rv[field.name] = ''
             else:
-                rv[field.name] = value
+                if value is not None:
+                    rv[field.name] = value
+                else:
+                    # set default value when value is missing
+                    rv[field.name] = {
+                        ParameterType.string: '',
+                        ParameterType.number: 0,
+                        ParameterType.boolean: False,
+                        ParameterType.date: '',
+                    }.get(field.type)
         return rv
 
     @staticmethod
