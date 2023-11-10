@@ -54,7 +54,7 @@ class Parameter:
         self.nullable = bool(data.get('nullable'))
         self.expression = data.get('expression', '')
         self.pattern = data.get('pattern', '')
-        self.pattern_has_currency = (self.pattern.find('$') != -1)
+        self.pattern_has_currency = '$' in self.pattern
         self.is_internal = self.name in ('page_count', 'page_number', 'row_number')
         self.test_data = None
         self.test_data_boolean = None

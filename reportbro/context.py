@@ -34,9 +34,11 @@ class Context:
         data['__context_id'] = self.id
         self.eval_functions = EVAL_DEFAULT_FUNCTIONS.copy()
         self.eval_functions.update(
-            len=len,
             decimal=decimal.Decimal,
-            datetime=datetime
+            datetime=datetime,
+            format_datetime=self.format_datetime_func,
+            format_decimal=self.format_decimal_func,
+            len=len,
         )
         self.root_data = data
         self.root_data['page_number'] = 0
@@ -297,7 +299,7 @@ class Context:
         elif value_type in (ParameterType.number, ParameterType.average, ParameterType.sum):
             if pattern:
                 used_pattern = pattern
-                pattern_has_currency = (pattern.find('$') != -1)
+                pattern_has_currency = '$' in pattern
             else:
                 used_pattern = parameter.pattern
                 pattern_has_currency = parameter.pattern_has_currency
@@ -374,3 +376,15 @@ class Context:
 
     def get_page_count(self):
         return self.root_data['page_count']
+
+    # --- custom functions for expression evaluation ---
+
+    def format_datetime_func(self, value, pattern):
+        return format_datetime(value, format=pattern, locale=self.pattern_locale)
+
+    def format_decimal_func(self, value, pattern):
+        value = format_decimal(value, format=pattern, locale=self.pattern_locale)
+        pattern_has_currency = '$' in pattern
+        if pattern_has_currency:
+            value = value.replace('$', self.pattern_currency_symbol)
+        return value
