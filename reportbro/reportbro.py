@@ -969,7 +969,7 @@ class Report:
         self.creation_date = parse_datetime_string(creation_date)
 
     @staticmethod
-    def get_test_data(parameter_list):
+    def get_test_data(parameter_list, include_image_data=True):
         """
         Extract test data from parameters.
 
@@ -979,6 +979,7 @@ class Report:
         saved within the report template.
 
         :param parameter_list: list of parameters (each entry is a dict containing parameter data)
+        :param include_image_data: if False then image test data will not be set (set to None value)
         :return: dict which contains name of all parameters and their test values
         """
         rv = {}
@@ -987,12 +988,12 @@ class Report:
             if not parameter.show_only_name_type:
                 if parameter.type == ParameterType.array or parameter.type == ParameterType.simple_array or\
                         parameter.type == ParameterType.map:
-                    rv[parameter.name] = parameter.get_test_data()
+                    rv[parameter.name] = parameter.get_test_data(include_image_data=include_image_data)
                 elif parameter.type == ParameterType.string or parameter.type == ParameterType.number or\
                         parameter.type == ParameterType.date:
                     rv[parameter.name] = parameter.test_data
                 elif parameter.type == ParameterType.boolean:
                     rv[parameter.name] = parameter.test_data_boolean
                 elif parameter.type == ParameterType.image:
-                    rv[parameter.name] = parameter.test_data_image
+                    rv[parameter.name] = parameter.test_data_image if include_image_data else None
         return rv

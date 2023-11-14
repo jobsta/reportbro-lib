@@ -109,7 +109,7 @@ class Parameter:
     def has_range(self):
         return bool(self.range_stack)
 
-    def get_test_data(self) -> Optional[Union[dict, list]]:
+    def get_test_data(self, include_image_data=True) -> Optional[Union[dict, list]]:
         """
         Extract test data from test data value of parameters.
 
@@ -118,6 +118,8 @@ class Parameter:
 
         This is used for ReportBro tests where data is extracted from parameter test data
         saved within the report template.
+
+        :param include_image_data: if False then image test data will not be set (set to None value)
         """
         test_data = None
         try:
@@ -126,7 +128,7 @@ class Parameter:
             pass
         if self.type in (ParameterType.array, ParameterType.simple_array, ParameterType.map):
             if test_data:
-                return self.get_parameter_test_data(self, test_data)
+                return self.get_parameter_test_data(self, test_data, include_image_data=include_image_data)
             else:
                 if self.type == ParameterType.map:
                     return {}
@@ -136,7 +138,7 @@ class Parameter:
         return None
 
     @staticmethod
-    def get_parameter_test_data(parameter, test_data):
+    def get_parameter_test_data(parameter, test_data, include_image_data):
         """
         Get test data from parameter.
 
@@ -144,12 +146,13 @@ class Parameter:
 
         :param parameter: parameter must be of type map, simple_array or array.
         :param test_data: test data for parameter, must be a dict for parameter type map and a list otherwise.
+        :param include_image_data: if False then image test data will not be set (set to None value)
         :return: test data in a dict for parameter type map and list otherwise.
         """
         if parameter.type == ParameterType.map:
             if not isinstance(test_data, dict):
                 test_data = {}
-            rv = Parameter.get_parameter_test_data_map(parameter, test_data)
+            rv = Parameter.get_parameter_test_data_map(parameter, test_data, include_image_data=include_image_data)
         elif parameter.type == ParameterType.simple_array:
             rv = Parameter.get_parameter_test_data_simple_array(test_data)
         elif parameter.type == ParameterType.array:
@@ -160,13 +163,14 @@ class Parameter:
                 if parameter.type == ParameterType.array:
                     if not isinstance(test_data_row, dict):
                         test_data_row = {}
-                    rv.append(Parameter.get_parameter_test_data_map(parameter, test_data_row))
+                    rv.append(Parameter.get_parameter_test_data_map(
+                        parameter, test_data_row, include_image_data=include_image_data))
         else:
             assert False
         return rv
 
     @staticmethod
-    def get_parameter_test_data_map(parameter, test_data):
+    def get_parameter_test_data_map(parameter, test_data, include_image_data):
         """
         The method is ported from the ReportBro Designer method Parameter.getSanitizedTestDataMap
         """
@@ -176,14 +180,14 @@ class Parameter:
                 continue
             value = test_data[field.name] if (field.name in test_data) else None
             if field.type == ParameterType.array or field.type == ParameterType.map:
-                rv[field.name] = Parameter.get_parameter_test_data(field, value)
+                rv[field.name] = Parameter.get_parameter_test_data(field, value, include_image_data=include_image_data)
             elif field.type == ParameterType.simple_array:
                 rv[field.name] = Parameter.get_parameter_test_data_simple_array(value)
             elif field.type == ParameterType.image:
-                if isinstance(value, dict) and 'data' in value:
+                if include_image_data and isinstance(value, dict) and 'data' in value:
                     rv[field.name] = value['data']
                 else:
-                    rv[field.name] = ''
+                    rv[field.name] = None
             else:
                 if value is not None:
                     rv[field.name] = value
