@@ -228,6 +228,9 @@ class Context:
                     Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=ex.msg, context=expr))
             except Exception as ex:
                 info = ex.message if hasattr(ex, 'message') else str(ex)
+                # replace name of own functions with name used in expression
+                info = info.replace('Context.format_datetime_func()', 'format_datetime()')
+                info = info.replace('Context.format_decimal_func()', 'format_decimal()')
                 raise ReportBroError(
                     Error('errorMsgInvalidExpression', object_id=object_id, field=field, info=info, context=expr))
         return True
