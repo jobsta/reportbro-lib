@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.5.0] - 2023-11-16
+
+### Changes
+* Support ':' prefix for parameter to access root parameter
+* Add functions "format_datetime" and "format_decimal" to format value in expressions
+
+### Bug Fixes
+* Initialize map parameter with default values if parameter is not nullable and no data is available
+* Fix error field for invalid test data
+
 ## [3.4.0] - 2023-10-23
 
 ### Changes
