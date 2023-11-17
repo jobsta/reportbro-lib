@@ -56,6 +56,7 @@ class Parameter:
         self.pattern = data.get('pattern', '')
         self.pattern_has_currency = '$' in self.pattern
         self.is_internal = self.name in ('page_count', 'page_number', 'row_number')
+        self.needs_evaluation = self.is_evaluated()
         self.test_data = None
         self.test_data_boolean = None
         self.test_data_image = None
@@ -78,10 +79,12 @@ class Parameter:
                 else:
                     self.children.append(parameter)
                     self.fields[parameter.name] = parameter
+                    if parameter.needs_evaluation:
+                        self.needs_evaluation = True
 
     def is_evaluated(self):
         """Return True if parameter data must be evaluated initially."""
-        return self.eval or self.is_range_function()
+        return not self.is_internal and (self.eval or self.is_range_function())
 
     def is_range_function(self):
         """Return True if parameter is a function with range input."""

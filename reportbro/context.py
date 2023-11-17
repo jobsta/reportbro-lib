@@ -346,7 +346,9 @@ class Context:
                 parameter_name = expr[pos+2:pos2]
 
                 param_ref = self.get_parameter(parameter_name)
-                parameter_name = parameter_name.replace('.', '_')
+                # replace "." (collection field) and ":" (data source prefix) to make sure
+                # parameter name is a valid Python identifier
+                parameter_name = parameter_name.replace('.', '_').replace(':', '_')
                 if param_ref:
                     value, _ = self.get_parameter_data(param_ref)
                 else:

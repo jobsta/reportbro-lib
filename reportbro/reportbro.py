@@ -878,35 +878,36 @@ class Report:
                     self.errors.append(Error(
                         'errorMsgPlusVersionRequired', object_id=parameter.id, field='type', context=parameter.name))
 
+    def evaluate_parameter(self, parameter, data):
+        if parameter.is_evaluated():
+            self.evaluate_parameter_expr(parameter, data)
+        elif parameter.type == ParameterType.map:
+            for field in parameter.children:
+                self.evaluate_parameter(field, data=data[parameter.name])
+        elif parameter.type == ParameterType.array:
+            eval_fields = []
+            for field in parameter.children:
+                if field.needs_evaluation:
+                    eval_fields.append(field)
+            if eval_fields:
+                param_ref = self.context.get_parameter(parameter.name)
+                if param_ref is not None:
+                    rows, data_exists = self.context.get_parameter_data(param_ref)
+                    if data_exists:
+                        row_parameters = dict()
+                        for row_parameter in parameter.children:
+                            row_parameters[row_parameter.name] = row_parameter
+
+                        for row in rows:
+                            self.context.push_context(row_parameters, row, data_source=param_ref.parameter)
+                            for field in eval_fields:
+                                self.evaluate_parameter(field, data=row)
+                            self.context.pop_context()
+
     def evaluate_parameters(self, parameters, data):
         for parameter in parameters:
-            if not parameter.is_internal:
-                if parameter.is_evaluated():
-                    self.evaluate_parameter_expr(parameter, data)
-                elif parameter.type == ParameterType.map:
-                    for field in parameter.children:
-                        if field.is_evaluated():
-                            # set dest_data so evaluated expression is set in map
-                            self.evaluate_parameter_expr(field, data, dest_data=data[parameter.name])
-                elif parameter.type == ParameterType.array:
-                    eval_fields = []
-                    for field in parameter.children:
-                        if field.eval:
-                            eval_fields.append(field)
-                    if eval_fields:
-                        param_ref = self.context.get_parameter(parameter.name)
-                        if param_ref is not None:
-                            rows, data_exists = self.context.get_parameter_data(param_ref)
-                            if data_exists:
-                                row_parameters = dict()
-                                for row_parameter in parameter.children:
-                                    row_parameters[row_parameter.name] = row_parameter
-
-                                for row in rows:
-                                    self.context.push_context(row_parameters, row, data_source=param_ref.parameter)
-                                    for field in eval_fields:
-                                        self.evaluate_parameter_expr(field, row)
-                                    self.context.pop_context()
+            if parameter.needs_evaluation:
+                self.evaluate_parameter(parameter, data)
 
     def evaluate_parameter_expr(self, parameter, data, dest_data=None):
         if not parameter.expression:
