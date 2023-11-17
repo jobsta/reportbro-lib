@@ -1,5 +1,7 @@
 import datetime
 
+current_datetime_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+
 
 def get_int_value(data, key):
     value = data.get(key)

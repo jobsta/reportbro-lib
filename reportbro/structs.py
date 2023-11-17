@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 from .enums import *
 from .errors import Error, ReportBroInternalError
-from .utils import get_float_value, get_int_value
+from .utils import current_datetime_str, get_float_value, get_int_value
 
 
 class Color:
@@ -129,12 +129,12 @@ class Parameter:
         if self.type in (ParameterType.array, ParameterType.simple_array, ParameterType.map):
             if test_data:
                 return self.get_parameter_test_data(self, test_data, include_image_data=include_image_data)
+            elif self.type == ParameterType.map:
+                # return map with default values for all map fields
+                return self.get_parameter_test_data(self, {}, include_image_data=include_image_data)
             else:
-                if self.type == ParameterType.map:
-                    return {}
-                else:
-                    # array or simple_array
-                    return []
+                # array or simple_array
+                return []
         return None
 
     @staticmethod
@@ -187,17 +187,17 @@ class Parameter:
                 if include_image_data and isinstance(value, dict) and 'data' in value:
                     rv[field.name] = value['data']
                 else:
-                    rv[field.name] = None
+                    rv[field.name] = ''
             else:
-                if value is not None:
+                if value:
                     rv[field.name] = value
                 else:
                     # set default value when value is missing
                     rv[field.name] = {
                         ParameterType.string: '',
-                        ParameterType.number: 0,
+                        ParameterType.number: '0',
                         ParameterType.boolean: False,
-                        ParameterType.date: '',
+                        ParameterType.date: current_datetime_str,
                     }.get(field.type)
         return rv
 

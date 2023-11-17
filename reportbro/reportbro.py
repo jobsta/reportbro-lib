@@ -32,7 +32,7 @@ from .elements import *
 from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
 from .structs import Parameter, TextStyle
-from .utils import get_int_value, parse_datetime_string
+from .utils import current_datetime_str, get_int_value, parse_datetime_string
 
 
 regex_valid_identifier = re.compile(r'^[^\d\W]\w*$', re.U)
@@ -989,11 +989,19 @@ class Report:
                 if parameter.type == ParameterType.array or parameter.type == ParameterType.simple_array or\
                         parameter.type == ParameterType.map:
                     rv[parameter.name] = parameter.get_test_data(include_image_data=include_image_data)
-                elif parameter.type == ParameterType.string or parameter.type == ParameterType.number or\
-                        parameter.type == ParameterType.date:
+                elif parameter.type == ParameterType.string:
                     rv[parameter.name] = parameter.test_data
+                elif parameter.type == ParameterType.number or parameter.type == ParameterType.date:
+                    if parameter.test_data:
+                        rv[parameter.name] = parameter.test_data
+                    else:
+                        # set default value if test data is missing
+                        if parameter.type == ParameterType.number:
+                            rv[parameter.name] = '0'
+                        elif parameter.type == ParameterType.date:
+                            rv[parameter.name] = current_datetime_str
                 elif parameter.type == ParameterType.boolean:
                     rv[parameter.name] = parameter.test_data_boolean
                 elif parameter.type == ParameterType.image:
-                    rv[parameter.name] = parameter.test_data_image if include_image_data else None
+                    rv[parameter.name] = parameter.test_data_image if include_image_data else ''
         return rv
