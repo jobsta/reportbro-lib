@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.1] - 2023-11-20
+
+### Changes
+* Improve retrieving test data from parameters - set default value for test data if data is missing
+* Evaluate parameter expressions for nested parameters
+
 ## [3.5.0] - 2023-11-16
 
 ### Changes
