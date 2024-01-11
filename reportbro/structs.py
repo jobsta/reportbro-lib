@@ -230,6 +230,14 @@ class BorderStyle:
         self.border_bottom = self.border_all or bool(data.get(key_prefix + 'borderBottom'))
 
 
+class TextLinePart:
+    def __init__(self, text, width, style, link):
+        self.text = text
+        self.width = width
+        self.style = style
+        self.link = link
+
+
 class TextStyle(BorderStyle):
     def __init__(self, data, key_prefix='', id_suffix=''):
         """

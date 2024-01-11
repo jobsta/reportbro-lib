@@ -18,7 +18,7 @@ from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
 from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, TableRenderElement,\
     FrameRenderElement, SectionRenderElement
-from .structs import BorderStyle, Color, ConditionalStyleRule, TextStyle
+from .structs import BorderStyle, Color, ConditionalStyleRule, TextLinePart, TextStyle
 from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
 
 
@@ -601,15 +601,12 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_formats[self.used_style.id]
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        content = self.get_spreadsheet_content()
+        content = self.text_lines[0] if self.text_lines else ''
         renderer.write(row, col, self.spreadsheet_colspan, content, cell_format,
                        self.width, url=self.prepared_link)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + (self.spreadsheet_colspan if self.spreadsheet_colspan else 1)
-
-    def get_spreadsheet_content(self):
-        return self.text_lines[0] if self.text_lines else ''
 
     def set_font_by_style(self, style, pdf_doc):
         if not pdf_doc.set_font(
@@ -632,10 +629,7 @@ class TextElement(DocElement):
                 text_line.add_text(text, text_width, self.used_style)
                 self.text_lines.append(text_line)
         else:
-            if hasattr(self.__class__, 'split_rich_text_lines'):
-                self.split_rich_text_lines(available_width, ctx, pdf_doc)
-            else:
-                raise ReportBroError(Error('errorMsgPlusVersionRequired', object_id=self.id, field='richText'))
+            raise ReportBroError(Error('errorMsgPlusVersionRequired', object_id=self.id, field='richText'))
 
         self.text_height = 0
         self.lines_count = len(self.text_lines)
@@ -777,14 +771,6 @@ class TextLine(object):
 
         if self.link:
             pdf_doc.link(x + offset_x, y, self.width, self.style.font_size, self.link)
-
-
-class TextLinePart:
-    def __init__(self, text, width, style, link):
-        self.text = text
-        self.width = width
-        self.style = style
-        self.link = link
 
 
 class TableTextElement(TextElement):
