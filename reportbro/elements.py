@@ -620,7 +620,8 @@ class TextElement(DocElement):
                 raise ReportBroError(
                     Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
             for line in lines:
-                text_line = TextLine(width=available_width, style=self.used_style, link=self.prepared_link)
+                text_line = TextLine(
+                    width=available_width, style=self.used_style, link=self.prepared_link, object_id=self.id)
                 text, text_width, _ = line
                 text_line.add_text(text, text_width, self.used_style)
                 self.text_lines.append(text_line)
@@ -674,12 +675,13 @@ class TextBlockElement(DocElementBase):
 
 
 class TextLine(object):
-    def __init__(self, width, style, link=None):
+    def __init__(self, width, style, link=None, object_id=None):
         self.available_width = width
         self.width = 0
         self.height = 0
         self.style = style
         self.link = link
+        self.object_id = object_id
         self.text = None
         self.last_line = False
         self.baseline_offset_y = 0
@@ -707,7 +709,7 @@ class TextLine(object):
             pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
                              size=self.style.font_size, underline=self.style.underline)
             pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
-            pdf_doc.text(render_x, render_y, self.text.text)
+            pdf_doc.print_text(render_x, render_y, self.text.text, object_id=self.object_id, field='content')
             if self.style.strikethrough:
                 # use underline thickness
                 strikethrough_thickness = pdf_doc.current_font['ut']
@@ -742,7 +744,7 @@ class TextLine(object):
             pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
             word_x = x
             for text, word_width in words:
-                pdf_doc.text(word_x, render_y, text)
+                pdf_doc.print_text(word_x, render_y, text, object_id=self.object_id, field='content')
                 word_x += word_width + word_spacing
 
             if self.style.strikethrough:

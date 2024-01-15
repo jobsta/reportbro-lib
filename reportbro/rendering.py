@@ -214,6 +214,7 @@ class BarCodeRenderElement(DocElementBase):
             self.height = barcode.barcode_height
             render_height = barcode.height
         self.svg_data = barcode.svg_data
+        self.object_id = barcode.id
         self.content_width = content_width  # width of content text when barcode value is displayed
         self.render_bottom = render_y + render_height
 
@@ -250,12 +251,13 @@ class BarCodeRenderElement(DocElementBase):
                         offset_y = 0
                     with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
                         # because we rotate by 270 degrees ccw we have to adapt the y offset on the x coordinate
-                        pdf_doc.text(x + offset_y, y, self.content)
+                        pdf_doc.print_text(x + offset_y, y, self.content, object_id=self.object_id, field='content')
                 else:
                     offset_x = (self.width - self.content_width) / 2
                     if offset_x < 0:
                         offset_x = 0
-                    pdf_doc.text(x + offset_x, y + self.height + 20, self.content)
+                    pdf_doc.print_text(
+                        x + offset_x, y + self.height + 20, self.content, object_id=self.object_id, field='content')
 
     def cleanup(self):
         if self.svg_data:

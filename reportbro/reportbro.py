@@ -512,6 +512,12 @@ class FPDFRB(fpdf.FPDF):
         else:
             return False
 
+    def print_text(self, x, y, text, object_id, field):
+        try:
+            fpdf.FPDF.text(self, x, y, text)
+        except fpdf.FPDFException:
+            raise ReportBroError(Error('errorMsgMissingGlyph', object_id=object_id, field=field))
+
 
 class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,

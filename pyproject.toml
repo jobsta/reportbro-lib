@@ -34,7 +34,7 @@ include = ["data/logo_watermark.png"]
 python = "^3.7"
 Babel = "^2.10.2"
 python-barcode = "^0.14.0"
-reportbro-fpdf2 = "^2.7.3"
+reportbro-fpdf2 = "^2.7.4"
 # reportbro-fpdf2 = { path = "../fpdf2/", develop = true}
 reportbro-simpleeval = "^0.9.11"
 Pillow = "^9.2.0"

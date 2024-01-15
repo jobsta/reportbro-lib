@@ -2,6 +2,9 @@
 
 ## Upcoming Release
 
+### Changes
+* Handle error when printing characters that are not contained in ttf font
+
 ### Bug Fixes
 * Fix rendering of line inside section
 * Fix printing table groups when there are hidden group rows due to "Print If" condition
