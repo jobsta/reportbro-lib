@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming Release
+## [3.6.0] - 2024-01-15
 
 ### Changes
 * Handle error when printing characters that are not contained in ttf font
