@@ -1,5 +1,11 @@
 # Changelog
 
+## Upcoming Release
+
+### Bug Fixes
+* Fix rendering of line inside section
+* Fix printing table groups when there are hidden group rows due to "Print If" condition
+ 
 ## [3.5.1] - 2023-11-20
 
 ### Changes
