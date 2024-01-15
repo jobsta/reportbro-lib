@@ -2,6 +2,9 @@
 
 ## [3.6.0] - 2024-01-15
 
+### Features
+* Support rich text in table cells (PLUS version)
+
 ### Changes
 * Handle error when printing characters that are not contained in ttf font
 
