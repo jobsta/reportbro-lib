@@ -263,6 +263,24 @@ class BarCodeRenderElement(DocElementBase):
             self.svg_data = None
 
 
+class LineRenderElement(DocElementBase):
+    def __init__(self, report, render_y, line):
+        DocElementBase.__init__(self, report, dict())
+        self.report = report
+        self.x = line.x
+        self.render_y = render_y
+        self.width = line.width
+        self.height = line.height
+        self.color = line.color
+
+    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
+        pdf_doc.set_draw_color(self.color.r, self.color.g, self.color.b)
+        pdf_doc.set_line_width(self.height)
+        x = self.x + container_offset_x
+        y = self.render_y + container_offset_y + (self.height / 2)
+        pdf_doc.line(x, y, x + self.width, y)
+
+
 class TableRenderElement(DocElementBase):
     def __init__(self, report, table, render_y):
         DocElementBase.__init__(self, report, dict(y=0))

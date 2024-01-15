@@ -16,8 +16,8 @@ from .context import Context
 from .docelement import DocElementBase, DocElement
 from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
-from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, TableRenderElement,\
-    FrameRenderElement, SectionRenderElement
+from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, LineRenderElement,\
+    TableRenderElement, FrameRenderElement, SectionRenderElement
 from .structs import BorderStyle, Color, ConditionalStyleRule, TextLinePart, TextStyle
 from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
 
@@ -282,12 +282,8 @@ class LineElement(DocElement):
         self.color = Color(data.get('color'))
         self.print_if = get_str_value(data, 'printIf')
 
-    def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
-        pdf_doc.set_draw_color(self.color.r, self.color.g, self.color.b)
-        pdf_doc.set_line_width(self.height)
-        x = self.x + container_offset_x
-        y = self.render_y + container_offset_y + (self.height / 2)
-        pdf_doc.line(x, y, x + self.width, y)
+    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+        return LineRenderElement(self.report, render_y=offset_y, line=self), True
 
 
 class PageBreakElement(DocElementBase):
