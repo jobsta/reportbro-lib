@@ -12,6 +12,7 @@ GUIDES = [
     '03_creating-tables', '04_table-column-printing', '05_table-grouping', '07_sections', '08_expressions',
     '12_dynamic-columns', '13_multi-page-layout',
 ]
+MISC_TESTS = ['table_group']
 
 
 class ReportRenderTest:
@@ -117,3 +118,8 @@ def test_report_demo_render(demo_name):
 @pytest.mark.parametrize('guide_name', GUIDES)
 def test_report_guide_render(guide_name):
     ReportRenderTest('guides', guide_name).run()
+
+
+@pytest.mark.parametrize('misc_name', MISC_TESTS)
+def test_report_misc_render(misc_name):
+    ReportRenderTest('misc', misc_name).run()

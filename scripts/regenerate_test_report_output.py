@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-from tests.test_report_render import ReportRenderTest, DEMOS, GUIDES
+from tests.test_report_render import ReportRenderTest, DEMOS, GUIDES, MISC_TESTS
 
 if __name__ == "__main__":
     group_name = None
@@ -18,3 +18,7 @@ if __name__ == "__main__":
         for test in GUIDES:
             if not report_name or test == report_name:
                 ReportRenderTest('guides', test).update_report_output(update_file=True, update_checksum=False)
+    if not group_name or group_name == 'misc':
+        for test in MISC_TESTS:
+            if not report_name or test == report_name:
+                ReportRenderTest('misc', test).update_report_output(update_file=True, update_checksum=False)
