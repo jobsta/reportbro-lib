@@ -712,7 +712,7 @@ class TextLine(object):
             pdf_doc.print_text(render_x, render_y, self.text.text, object_id=self.object_id, field='content')
             if self.style.strikethrough:
                 # use underline thickness
-                strikethrough_thickness = pdf_doc.current_font['ut']
+                strikethrough_thickness = pdf_doc.current_font.ut
                 render_line_y = render_y - self.style.font_size * 0.3
                 strikethrough_width = strikethrough_thickness / 1000.0 * self.style.font_size
                 pdf_doc.set_line_width(strikethrough_width)
@@ -748,8 +748,8 @@ class TextLine(object):
                 word_x += word_width + word_spacing
 
             if self.style.strikethrough:
-                line_position = pdf_doc.current_font['up']
-                line_thickness = pdf_doc.current_font['ut']
+                line_position = pdf_doc.current_font.up
+                line_thickness = pdf_doc.current_font.ut
                 # strikethrough with an offset from baseline
                 render_y = y + self.baseline_offset_y - font_size * 0.3
                 line_width = line_thickness / 1000.0 * font_size
@@ -758,8 +758,8 @@ class TextLine(object):
                 pdf_doc.line(x, render_y, x + self.available_width, render_y)
 
             if self.style.underline:
-                line_position = pdf_doc.current_font['up']
-                line_thickness = pdf_doc.current_font['ut']
+                line_position = pdf_doc.current_font.up
+                line_thickness = pdf_doc.current_font.ut
                 # underline needs offset for line position
                 render_y = y + self.baseline_offset_y - (line_position / 1000.0 * font_size)
                 line_width = line_thickness / 1000.0 * font_size

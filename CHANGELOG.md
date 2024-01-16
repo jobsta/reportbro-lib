@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.1] - 2024-01-16
+
+### Bug Fixes
+* Fix rendering of justified text with underline or strikethrough formatting
+
 ## [3.6.0] - 2024-01-15
 
 ### Features
