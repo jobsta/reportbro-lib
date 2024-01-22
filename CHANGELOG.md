@@ -14,6 +14,7 @@
 
 ### Features
 * Support rich text in table cells (PLUS version)
+* Support text shaping (PLUS version)
 
 ### Changes
 * Handle error when printing characters that are not contained in ttf font
