@@ -283,6 +283,9 @@ class LineElement(DocElement):
         self.print_if = get_str_value(data, 'printIf')
 
     def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+        self.render_y = offset_y
+        self.render_bottom = offset_y
+        self.rendering_complete = True
         return LineRenderElement(self.report, render_y=offset_y, line=self), True
 
 
