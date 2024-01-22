@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.2] - 2024-01-22
+
+### Bug Fixes
+* Fix rendering line
+
 ## [3.6.1] - 2024-01-16
 
 ### Bug Fixes
