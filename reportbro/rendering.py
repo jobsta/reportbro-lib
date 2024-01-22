@@ -109,7 +109,7 @@ class BarcodeSVGWriter(SVGWriter):
             number_of_lines : Integer
                 Number of lines of the barcode.
 
-        :returns: Width and height of the barcode in pixel.
+        :return: Width and height of the barcode in pixel.
         :rtype: Tuple
         """
         width = 2 * self.quiet_zone + modules_per_line * self.module_width

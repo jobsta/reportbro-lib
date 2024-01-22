@@ -4,7 +4,7 @@ from collections import namedtuple
 from simpleeval import simple_eval, NameNotDefined, FunctionNotDefined
 from simpleeval import DEFAULT_NAMES as EVAL_DEFAULT_NAMES
 from simpleeval import DEFAULT_FUNCTIONS as EVAL_DEFAULT_FUNCTIONS
-from typing import List
+from typing import List, Optional
 import datetime
 import decimal
 
@@ -50,7 +50,7 @@ class Context:
         # if a range is set we have to evaluate parameter functions (e.g. sum/avg) because the range could be affected
         self.range_count = 0
 
-    def get_parameter(self, name, context_entry=None):
+    def get_parameter(self, name: str, context_entry: Optional[ContextEntry] = None) -> Optional[ParameterRef]:
         """
         Return parameter reference for given parameter name.
 
@@ -115,7 +115,7 @@ class Context:
         else:
             return self._get_parameter(name, context_entry=context_entry)
 
-    def _get_parameter(self, name, context_entry=None):
+    def _get_parameter(self, name: str, context_entry: Optional[ContextEntry] = None) -> Optional[ParameterRef]:
         if context_entry is None:
             context_entry = self.context_stack[-1]
         parameters = context_entry[CONTEXT_ENTRY_PARAMETERS]
@@ -129,7 +129,7 @@ class Context:
                 return self._get_parameter(name, context_entry=parent_context_entry)
         return None
 
-    def get_parameter_data(self, param_ref):
+    def get_parameter_data(self, param_ref: ParameterRef):
         """
         Return data for given parameter reference.
 
@@ -350,7 +350,16 @@ class Context:
                 rv = str(value)
         return rv
 
-    def replace_parameters(self, expr, data):
+    def replace_parameters(self, expr: str, data: dict) -> str:
+        """
+        Replace parameter references with valid Python identifier names and set parameter value in given data dict.
+        The returned string is a valid Python expression and can be evaluated with simpleeval lib.
+
+        :param expr: Python expression where parameter references in the format "${parameter_name}" are replace
+        with a valid Python identifier.
+        :param data: when parameter references are replaced its value is set in this dict.
+        :return: Python expression with replaced parameter references.
+        """
         pos = expr.find('${')
         if pos == -1:
             return expr
