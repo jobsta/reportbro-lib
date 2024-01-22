@@ -173,7 +173,21 @@ class Context:
             raise ReportBroInternalError('Context.pop_context failed')
         self.context_stack = self.context_stack[:-1]
 
-    def fill_parameters(self, expr, object_id, field, pattern=None):
+    def fill_parameters(
+            self, expr: str, object_id: int, field: str, pattern: str = None,
+            parameter_type: Optional[ParameterType] = None) -> str:
+        """
+        Return a string where parameter references are replaced with parameter value. A parameter is referenced
+        in the format "${parameter_name}".
+
+        :param expr: input string which can contain parameter references.
+        :param object_id: object id where the expression belongs to, used in case an error is thrown.
+        :param field: field name of the expression, used in case an error is thrown.
+        :param pattern: optional pattern to format a parameter value. If the pattern is set then it is
+        used for all parameter references.
+        :param parameter_type: if set then only parameters which match this type are replaced with the parameter value.
+        :return: string with replaced parameter references.
+        """
         if expr.find('${') == -1:
             return expr
         rv = ''
@@ -194,15 +208,19 @@ class Context:
                         raise ReportBroError(
                             Error('errorMsgInvalidExpressionNameNotDefined',
                                   object_id=object_id, field=field, info=parameter_name))
-                    value, value_exists = self.get_parameter_data(param_ref)
+                    if parameter_type is None or param_ref.parameter.type == parameter_type:
+                        value, value_exists = self.get_parameter_data(param_ref)
 
-                    if not value_exists:
-                        raise ReportBroError(
-                            Error('errorMsgMissingParameterData',
-                                  object_id=object_id, field=field, info=parameter_name))
+                        if not value_exists:
+                            raise ReportBroError(
+                                Error('errorMsgMissingParameterData',
+                                      object_id=object_id, field=field, info=parameter_name))
 
-                    if value is not None:
-                        rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+                        if value is not None:
+                            rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+                    else:
+                        # parameter type is set and referenced parameter does not match type -> do not replace parameter
+                        rv += '${' + parameter_name + '}'
                     parameter_index = -1
             prev_c = c
         return rv
