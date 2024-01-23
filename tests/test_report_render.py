@@ -65,11 +65,13 @@ class ReportRenderTest:
         report.set_creation_date('2023-03-23 10:01:24')
         return report
 
-    def _get_reference_report_file_name(self, format_type: str) -> Path:
-        return self.base_dir.joinpath(f'report.{format_type}')
+    def _get_reference_report_file_name(self, format_type: str, overwrite: bool = True) -> Path:
+        base_name = 'report' if overwrite else 'report_modified'
+        return self.base_dir.joinpath(f'{base_name}.{format_type}')
 
-    def _get_checksum_file_name(self, format_type: str) -> Path:
-        return self.base_dir.joinpath(f'report.{format_type}.checksum')
+    def _get_checksum_file_name(self, format_type: str, overwrite: bool = True) -> Path:
+        base_name = 'report' if overwrite else 'report_modified'
+        return self.base_dir.joinpath(f'{base_name}.{format_type}.checksum')
 
     def _get_checksum(self, format_type: str) -> str:
         checksum_file = self._get_checksum_file_name(format_type)
@@ -98,16 +100,31 @@ class ReportRenderTest:
         for format_type in ReportRenderTest.formats:
             self._run_format(format_type)
 
-    def update_report_output(self, update_file=True, update_checksum=False):
+    def update_report_output(self, update_file: bool = True, update_checksum: bool = False, overwrite: bool = True):
         for format_type in ReportRenderTest.formats:
             report = self._get_report()
             assert len(report.errors) == 0
-            generate_function = report.__getattribute__(f'generate_{format_type}')
-            report_data = generate_function()
+            report_data = self.generate_report_data(format_type)
+            if not overwrite:
+                # only write modified file in case checksum changed
+                calculated_checksum = sha256(report_data).hexdigest()
+                test_checksum = self._get_checksum(format_type)
+                if test_checksum == calculated_checksum:
+                    update_file = update_checksum = False
+
             if update_checksum:
-                self._get_checksum_file_name(format_type).write_text(sha256(report_data).hexdigest(), 'utf-8')
+                self._get_checksum_file_name(format_type, overwrite=overwrite).write_text(
+                    sha256(report_data).hexdigest(), 'utf-8')
             if update_file:
-                self._get_reference_report_file_name(format_type).write_bytes(report_data)
+                self._get_reference_report_file_name(format_type, overwrite=overwrite).write_bytes(report_data)
+
+    def generate_report_data(self, format_type: str):
+        report = self._get_report()
+        if format_type == 'pdf':
+            return report.generate_pdf()
+        elif format_type == 'xlsx':
+            return report.generate_xlsx()
+        assert False
 
 
 @pytest.mark.parametrize('demo_name', DEMOS)
