@@ -704,18 +704,20 @@ class TextLine(object):
 
     def render_pdf(self, x, y, pdf_doc):
         offset_x = 0
+        pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
+                         size=self.style.font_size, underline=self.style.underline)
+        pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
+
         # last line of justified text is aligned left
         if self.style.horizontal_alignment != HorizontalAlignment.justify or self.last_line:
             if self.style.horizontal_alignment == HorizontalAlignment.center:
                 offset_x = ((self.available_width - self.width) / 2)
             elif self.style.horizontal_alignment == HorizontalAlignment.right:
                 offset_x = self.available_width - self.width
+
             render_x = x + offset_x
             render_y = y + self.baseline_offset_y
 
-            pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
-                             size=self.style.font_size, underline=self.style.underline)
-            pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
             pdf_doc.print_text(render_x, render_y, self.text.text, object_id=self.object_id, field='content')
             if self.style.strikethrough:
                 # use underline thickness
@@ -734,8 +736,6 @@ class TextLine(object):
             total_word_width = 0
             font_size = self.style.font_size
 
-            pdf_doc.set_font(family=self.style.font, style=self.style.font_style,
-                             size=font_size, underline=self.style.underline)
             pwords = self.text.text.split()
             for pword in pwords:
                 tmp_width = pdf_doc.get_string_width(pword)
@@ -748,7 +748,6 @@ class TextLine(object):
             render_y = y + self.baseline_offset_y
 
             # draw words with equal space between words
-            pdf_doc.set_text_color(self.style.text_color.r, self.style.text_color.g, self.style.text_color.b)
             word_x = x
             for text, word_width in words:
                 pdf_doc.print_text(word_x, render_y, text, object_id=self.object_id, field='content')
