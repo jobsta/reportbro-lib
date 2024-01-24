@@ -285,7 +285,7 @@ class DocumentProperties:
             rbro_locale = Locale(self.pattern_locale)
             rbro_locale.number_symbols  # ensure instance has been populated
             self.pattern_locale = deepcopy(rbro_locale)
-            self.pattern_locale.number_symbols['group'] = self.pattern_number_group_symbol
+            self.pattern_locale.number_symbols['latn']['group'] = self.pattern_number_group_symbol
 
         self.header = bool(data.get('header'))
         if self.header:

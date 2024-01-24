@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming Release
+
+### Bug Fixes
+* Fix error using custom thousands separator
+
 ## [3.6.2] - 2024-01-22
 
 ### Bug Fixes
