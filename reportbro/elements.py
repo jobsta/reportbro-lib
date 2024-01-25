@@ -610,9 +610,13 @@ class TextElement(DocElement):
     def set_font_by_style(self, style, pdf_doc):
         if not pdf_doc.set_font(
                 style.font, style.font_style, style.font_size, underline=style.underline):
-            error_field = style.key_prefix + 'font'
-            raise ReportBroError(
-                Error('errorMsgFontNotAvailable', object_id=self.id, field=error_field))
+            if self.rich_text:
+                msg_key = 'errorMsgInvalidRichTextFontNotAvailable'
+                error_field = 'richTextContent'
+            else:
+                msg_key = 'errorMsgFontNotAvailable'
+                error_field = style.key_prefix + 'font'
+            raise ReportBroError(Error(msg_key=msg_key, object_id=self.id, field=error_field))
 
     def split_text_lines(self, content, available_width, ctx, pdf_doc):
         if content is not None:
