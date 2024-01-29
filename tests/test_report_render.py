@@ -87,16 +87,13 @@ class ReportRenderTest:
             return sha256(data).hexdigest()
 
     def _run_format(self, format_type: str):
-        report = self._get_report()
-        generate_function = report.__getattribute__(f'generate_{format_type}')
-        calculated_checksum = sha256(generate_function()).hexdigest()
+        report_data = self.generate_report_data(format_type)
+        calculated_checksum = sha256(report_data).hexdigest()
         test_checksum = self._get_checksum(format_type)
         print(f'checking type {format_type} with checksum {calculated_checksum}')
         assert (test_checksum == calculated_checksum)
 
     def run(self):
-        # pre-defined creationDate we use for testing
-        # data = report_definition['parameters']
         for format_type in ReportRenderTest.formats:
             self._run_format(format_type)
 
