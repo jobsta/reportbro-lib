@@ -37,12 +37,13 @@ class ParameterType(Enum):
     number = 2
     boolean = 3
     date = 4
-    array = 5
-    simple_array = 6
-    map = 7
-    sum = 8
-    average = 9
-    image = 10
+    rich_text = 5
+    array = 6
+    simple_array = 7
+    map = 8
+    sum = 9
+    average = 10
+    image = 11
 
 
 class BandType(Enum):

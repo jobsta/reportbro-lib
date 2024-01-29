@@ -60,10 +60,12 @@ class Parameter:
         self.test_data = None
         self.test_data_boolean = None
         self.test_data_image = None
+        self.test_data_rich_text = None
         if init_test_data:
             self.test_data = data.get('testData')
             self.test_data_boolean = data.get('testDataBoolean')
             self.test_data_image = data.get('testDataImage')
+            self.test_data_rich_text = data.get('testDataRichText')
         self.range_stack = []
         self.children = []
         self.show_only_name_type = bool(data.get('showOnlyNameType'))
@@ -201,6 +203,7 @@ class Parameter:
                         ParameterType.number: '0',
                         ParameterType.boolean: False,
                         ParameterType.date: current_datetime_str,
+                        ParameterType.rich_text: '',
                     }.get(field.type)
         return rv
 

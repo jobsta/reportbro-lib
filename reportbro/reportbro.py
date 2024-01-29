@@ -710,7 +710,7 @@ class Report:
 
     def parse_parameter_value(self, parameter, parent_id, is_test_data, parameter_type, value):
         error_field = 'testData' if is_test_data else 'type'
-        if parameter_type == ParameterType.string:
+        if parameter_type in (ParameterType.string, ParameterType.rich_text):
             if value is not None:
                 if not isinstance(value, str):
                     raise ReportBroInternalError(
@@ -793,7 +793,7 @@ class Report:
             if not parameter.is_evaluated():
                 value = src_data.get(parameter.name)
                 if parameter_type in (ParameterType.string, ParameterType.number,
-                                      ParameterType.boolean, ParameterType.date):
+                                      ParameterType.boolean, ParameterType.date, ParameterType.rich_text):
                     value = self.parse_parameter_value(parameter, parent_id, is_test_data, parameter_type, value)
                     dest_data[parameter.name] = value
                 elif parameter_type == ParameterType.image:
@@ -1011,4 +1011,6 @@ class Report:
                     rv[parameter.name] = parameter.test_data_boolean
                 elif parameter.type == ParameterType.image:
                     rv[parameter.name] = parameter.test_data_image if include_image_data else ''
+                elif parameter.type == ParameterType.rich_text:
+                    rv[parameter.name] = parameter.test_data_rich_text
         return rv
