@@ -2,6 +2,12 @@
 
 ## Upcoming Release
 
+### Features
+* Support rich text parameters (PLUS version)
+
+### Changes
+* Drop support for Python 3.7 (EOL June 2023)
+
 ### Bug Fixes
 * Fix error using custom thousands separator
 
