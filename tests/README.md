@@ -17,7 +17,7 @@ Each demo has a directory in `tests/data/demos/` with the following content:
 
 * a json file called like the demo (e.g. `invoice.json`) containing the report definition
 * report.pdf or report.pdf.checksum
-* report.xlsx or  report.xlsx.checksum
+* report.xlsx or report.xlsx.checksum
 * data.json (optional)
 
 If no `data.json` is found the test parameters from the report definition are used (if any).
