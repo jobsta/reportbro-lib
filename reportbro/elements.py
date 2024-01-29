@@ -304,9 +304,16 @@ class TextElement(DocElement):
         DocElement.__init__(self, report, data)
         self.content = get_str_value(data, 'content')
         self.rich_text = bool(data.get('richText'))
-        self.rich_text_content = data.get('richTextContent') or {}
-        if self.rich_text and not isinstance(self.rich_text_content, dict):
-            raise ReportBroInternalError(f'Invalid richTextContent for text element {self.id}')
+        self.rich_text_html = get_str_value(data, 'richTextHtml')
+        self.rich_text_content = (data.get('richTextContent') or {'ops': []}) if self.rich_text else None
+        if self.rich_text_content:
+            # make sure existing operations are valid
+            if not isinstance(self.rich_text_content, dict) or not isinstance(self.rich_text_content.get('ops'), list):
+                raise ReportBroInternalError(f'Invalid richTextContent for text element {self.id}')
+            for op in self.rich_text_content.get('ops'):
+                if not isinstance(op, dict) or not isinstance(op.get('insert'), str):
+                    raise ReportBroInternalError(f'Invalid richTextContent for text element {self.id}')
+
         self.eval = bool(data.get('eval'))
         if data.get('styleId'):
             style = report.styles.get(get_int_value(data, 'styleId'))
