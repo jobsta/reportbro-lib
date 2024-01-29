@@ -871,7 +871,7 @@ class Report:
                             else:
                                 self.errors.append(Error(
                                     'errorMsgInvalidMap',
-                                    object_id=parameter.id, field='type', context=parameter.name))
+                                    object_id=parameter.id, field=field, context=parameter.name))
                         elif value is None:
                             dest_data[parameter.name] = value
                         else:
