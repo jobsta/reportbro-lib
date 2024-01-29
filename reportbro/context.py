@@ -10,6 +10,7 @@ import decimal
 
 from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
+from .structs import Parameter
 
 
 # parameter instance, the data map referenced by the parameter and the data map containing
@@ -175,7 +176,8 @@ class Context:
 
     def fill_parameters(
             self, expr: str, object_id: int, field: str, pattern: str = None,
-            parameter_type: Optional[ParameterType] = None) -> str:
+            parameter_type: Optional[ParameterType] = None,
+            replaced_parameters: Optional[List[Parameter]] = None) -> str:
         """
         Return a string where parameter references are replaced with parameter value. A parameter is referenced
         in the format "${parameter_name}".
@@ -186,6 +188,7 @@ class Context:
         :param pattern: optional pattern to format a parameter value. If the pattern is set then it is
         used for all parameter references.
         :param parameter_type: if set then only parameters which match this type are replaced with the parameter value.
+        :param replaced_parameters: if set then parameters which are replaced by its value are added to this list.
         :return: string with replaced parameter references.
         """
         if expr.find('${') == -1:
@@ -218,6 +221,9 @@ class Context:
 
                         if value is not None:
                             rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+
+                        if replaced_parameters is not None:
+                            replaced_parameters.append(param_ref.parameter)
                     else:
                         # parameter type is set and referenced parameter does not match type -> do not replace parameter
                         rv += '${' + parameter_name + '}'
@@ -348,6 +354,8 @@ class Context:
                               object_id=error_object_id, field='pattern', context=value))
             else:
                 rv = str(value)
+        elif value_type == ParameterType.rich_text:
+            rv = value
         return rv
 
     def replace_parameters(self, expr: str, data: dict) -> str:
