@@ -468,7 +468,8 @@ class FPDFRB(fpdf.FPDF):
                 font['styleI'] = italic_style
                 font['styleBI'] = bold_italic_style
 
-                self.available_fonts[additional_font.get('value', '')] = font
+                # store fonts with lowercase font name
+                self.available_fonts[additional_font.get('value', '').lower()] = font
 
     def add_image(self, img, image_key):
         self.loaded_images[image_key] = img
@@ -490,7 +491,9 @@ class FPDFRB(fpdf.FPDF):
         :param underline: True if text should be rendered with underlined style.
         :return: True if font exists, False otherwise.
         """
-        font = self.available_fonts.get(family)
+        font_name = family.lower()
+        # fonts are stored with lowercase font name
+        font = self.available_fonts.get(font_name)
         if font:
             if not font['standard_font']:
                 # get font for specific style
@@ -505,7 +508,7 @@ class FPDFRB(fpdf.FPDF):
                     style_font = font['style']
 
                 if not style_font['font_added']:
-                    self.add_font(family, style=style, fname=style_font['font_filename'])
+                    self.add_font(font_name, style=style, fname=style_font['font_filename'])
                     style_font['font_added'] = True
 
             if underline:

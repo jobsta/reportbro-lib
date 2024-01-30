@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 from .enums import *
 from .errors import Error, ReportBroInternalError
-from .utils import current_datetime_str, get_float_value, get_int_value
+from .utils import current_datetime_str, get_float_value, get_int_value, get_str_value
 
 
 class Color:
@@ -264,7 +264,7 @@ class TextStyle(BorderStyle):
         self.vertical_alignment = VerticalAlignment[data.get(key_prefix + 'verticalAlignment')]
         self.text_color = Color(data.get(key_prefix + 'textColor'))
         self.background_color = Color(data.get(key_prefix + 'backgroundColor'))
-        self.font = data.get(key_prefix + 'font')
+        self.font = get_str_value(data, key_prefix + 'font')
         self.font_size = get_int_value(data, key_prefix + 'fontSize')
         self.line_spacing = get_float_value(data, key_prefix + 'lineSpacing')
         self.padding_left = get_int_value(data, key_prefix + 'paddingLeft')
