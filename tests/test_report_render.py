@@ -12,7 +12,9 @@ GUIDES = [
     '03_creating-tables', '04_table-column-printing', '05_table-grouping', '07_sections', '08_expressions',
     '12_dynamic-columns', '13_multi-page-layout',
 ]
-MISC_TESTS = ['line', 'table_group', 'text_justified']
+MISC_TESTS = [
+    'hello_world', 'line', 'table_group', 'text_justified',
+]
 
 
 class ReportRenderTest:

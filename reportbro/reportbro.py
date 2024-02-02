@@ -381,7 +381,10 @@ class ImageData:
                     Error('errorMsgInvalidImageSource', object_id=image_id, field='source'))
 
         if self.image_type is not None:
-            if self.image_type not in ('png', 'jpg', 'jpeg', 'webp'):
+            if self.image_type == 'jpg':
+                # set 'jpeg' instead of 'jpg' (same extension as used in Pillow library)
+                self.image_type = 'jpeg'
+            if self.image_type not in ('png', 'jpeg', 'webp'):
                 raise ReportBroError(
                     Error('errorMsgUnsupportedImageType', object_id=image_id, field='source'))
 

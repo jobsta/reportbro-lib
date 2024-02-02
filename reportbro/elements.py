@@ -106,7 +106,12 @@ class ImageElement(DocElement):
                     raw_image = raw_image.resize(
                         (int(image_display_width), int(image_display_height)), PIL.Image.BILINEAR)
                     image.image_data = BytesIO()
-                    raw_image.save(image.image_data, format='PNG' if image.image_type.upper() == 'PNG' else 'JPEG')
+                    # if image_type is webp the image will be converted to png
+                    raw_image.save(image.image_data, format='JPEG' if image.image_type.upper() == 'JPEG' else 'PNG')
+                elif image.image_type == 'webp':
+                    # convert image to png because webp is not supported in XlsxWriter
+                    image.image_data = BytesIO()
+                    raw_image.save(image.image_data, format='PNG')
 
                 renderer.insert_image(row, col, image_filename=self.image_filename, image_data=image.image_data,
                                       width=self.width, url=self.prepared_link)

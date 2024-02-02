@@ -10,6 +10,7 @@
 
 ### Bug Fixes
 * Fix error using custom thousands separator
+* Fix xlsx output for report with webp image
 
 ## [3.6.2] - 2024-01-22
 
