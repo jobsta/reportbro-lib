@@ -219,11 +219,19 @@ class Context:
                                 Error('errorMsgMissingParameterData',
                                       object_id=object_id, field=field, info=parameter_name))
 
-                        if value is not None:
-                            rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
-
                         if replaced_parameters is not None:
                             replaced_parameters.append(param_ref.parameter)
+
+                        if value is not None:
+                            # if expression only contains rich-text parameter inside p tag and parameter starts
+                            # with p tag we return the parameter value (and thus exclude the surrounding p tag).
+                            # this allows rich text parameter content with p tags, otherwise p tags are always
+                            # present in the content where the parameter is contained.
+                            if param_ref.parameter.type == ParameterType.rich_text and\
+                                    value[:2] == '<p' and rv == '<p>' and expr[i + 1:] == '</p>':
+                                return value
+                            else:
+                                rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
                     else:
                         # parameter type is set and referenced parameter does not match type -> do not replace parameter
                         rv += '${' + parameter_name + '}'
