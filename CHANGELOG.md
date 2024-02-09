@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming Release
+## [3.7.0] - 2024-02-09
 
 ### Features
 * Support rich text parameters (PLUS version)
