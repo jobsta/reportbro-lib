@@ -10,7 +10,7 @@ See the ReportBro project website on https://www.reportbro.com for full document
 Features
 --------
 
-* Python >= 3.7 support
+* Python >= 3.8 support
 * Generate pdf and xlsx reports
 * Supports (repeating) header and footer
 * Allows predefined and own page formats
@@ -25,7 +25,7 @@ Installation
 
     pip install reportbro-lib
 
-Go to https://www.reportbro.com/doc/api#lib-arguments for more information on configuration and usage.
+Go to https://www.reportbro.com/framework/api#lib-arguments for more information on configuration and usage.
 
 Python Coding Style
 -------------------
@@ -41,7 +41,7 @@ License
 
 - Commercial license
 
-If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/license/index
+If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/framework/license
 
 This license includes ReportBro PLUS with additional features.
 
@@ -49,4 +49,4 @@ This license includes ReportBro PLUS with additional features.
 
 If you are creating an open-source application under a license compatible with the `GNU AGPL license v3 <https://www.gnu.org/licenses/agpl-3.0.html>`_, you may use ReportBro under the terms of the AGPLv3.
 
-Read more about ReportBro's license options at https://www.reportbro.com/license/index.
+Read more about ReportBro's license options at https://www.reportbro.com/framework/license.
