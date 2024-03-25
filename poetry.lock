@@ -422,13 +422,14 @@ fonttools = ">=4.34.0"
 Pillow = ">=6.2.2,<9.2.dev0 || >=9.3.dev0"
 
 [[package]]
-name = "reportbro-simpleeval"
-version = "0.9.11"
+name = "simpleeval"
+version = "0.9.13"
 description = "A simple, safe single expression evaluator library."
 optional = false
 python-versions = "*"
 files = [
-    {file = "reportbro_simpleeval-0.9.11-py3-none-any.whl", hash = "sha256:0d4e0fc28b77ee443e78483a9739675cb237f7e311c4d0d6a488933b685630e2"},
+    {file = "simpleeval-0.9.13-py2.py3-none-any.whl", hash = "sha256:22a2701a5006e4188d125d34accf2405c2c37c93f6b346f2484b6422415ae54a"},
+    {file = "simpleeval-0.9.13.tar.gz", hash = "sha256:4a30f9cc01825fe4c719c785e3762623e350c4840d5e6855c2a8496baaa65fac"},
 ]
 
 [[package]]
@@ -467,4 +468,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "125a5fe7f022e97e2f4a6cb621de8985fa1a7d4ecaef661cf0c7a35eb8781466"
+content-hash = "6559009d822707d9dc1071535e0040233d76aff8e4b4a26f8ce2a9f635e1a0d1"
