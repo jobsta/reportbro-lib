@@ -33,17 +33,17 @@ include = ["data/logo_watermark.png"]
 [tool.poetry.dependencies]
 python = "^3.8"
 Babel = "^2.14.0"
-python-barcode = "^0.14.0"
+python-barcode = "^0.15.1"
 reportbro-fpdf2 = "^2.7.4"
 # reportbro-fpdf2 = { path = "../fpdf2/", develop = true}
 reportbro-simpleeval = "^0.9.11"
-Pillow = "^9.2.0"
+Pillow = "^10.2.0"
 qrcode = "^7.4.2"
 XlsxWriter = "^3.0.3"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.2.2"
-pytest-cov = "^4.0.0"
+pytest = "^8.1.1"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
