@@ -36,7 +36,7 @@ Babel = "^2.14.0"
 python-barcode = "^0.15.1"
 reportbro-fpdf2 = "^2.7.4"
 # reportbro-fpdf2 = { path = "../fpdf2/", develop = true}
-reportbro-simpleeval = "^0.9.11"
+simpleeval = "^0.9.13"
 Pillow = "^10.2.0"
 qrcode = "^7.4.2"
 XlsxWriter = "^3.0.3"
