@@ -1,9 +1,8 @@
 name: Publish
 
 on:
-  create:
-    tags:
-      - v*
+  release:
+    types: [released]
 
 jobs:
   deploy:
@@ -20,13 +19,13 @@ jobs:
       statuses: read
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     - name: Load cached $HOME/.local
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.local
         key: dotlocal-${{ runner.os }}-${{ hashFiles('.github/workflows/publish.yml') }}
@@ -36,7 +35,7 @@ jobs:
       run: |
         poetry publish --build --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
     - name: Upload Release Assets
-      uses: alexellis/upload-assets@0.3.0
+      uses: alexellis/upload-assets@0.4.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
