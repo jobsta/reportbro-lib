@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.7.1] - 2024-04-09
+
+### Changes
+* Update dependencies
+* Use simpleeval instread of reportbro-simpleeval
+
+### Bug Fixes
+* Removed deprecation warning with python 3.11
+
 ## [3.7.0] - 2024-02-09
 
 ### Features
