@@ -36,6 +36,11 @@ of PEP 8 can be found at https://pep8.org
 
 For pull requests the same coding styles should be used.
 
+ReportBro Cloud
+---------------
+
+With ReportBro Cloud you can manage all your reports in your account and use only a simple web request in your application to get the report file. `Try ReportBro as cloud service <https://www.reportbro.com/auth_user/register>`_.
+
 License
 -------
 
