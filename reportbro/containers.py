@@ -21,7 +21,7 @@ class Container(object):
         self.manual_page_break = False
         self.first_element_offset_y = 0
         # maximum bottom value (from element layout coordinates) of currently rendered elements,
-        # this is used the determine if the minimum height of a container
+        # this is used to determine if the minimum height of a container
         # (e.g. table or section band) is reached
         self.max_bottom = 0
         # maximum bottom render value of currently rendered elements, this is the actual container
