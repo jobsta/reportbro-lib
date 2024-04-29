@@ -1593,6 +1593,11 @@ class SectionBandElement(object):
             report.document_properties.margin_left - report.document_properties.margin_right
         self.height = get_int_value(data, 'height')
         self.band_type = band_type
+        self.background_color = Color(data.get('backgroundColor'))
+        if band_type == BandType.content:
+            self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
+        else:
+            self.alternate_background_color = None
         if band_type == BandType.header:
             self.repeat_header = bool(data.get('repeatHeader'))
             self.always_print_on_same_page = True
@@ -1745,7 +1750,7 @@ class SectionElement(DocElement):
 
         if self.print_header:
             self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
-            render_element.add_section_band(self.header)
+            render_element.add_section_band(self.header, background_color=self.header.background_color)
             if not self.header.rendering_complete:
                 return render_element, False
             if not self.header.repeat_header:
@@ -1757,7 +1762,11 @@ class SectionElement(DocElement):
             self.content.create_render_elements(
                 offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
             ctx.pop_context()
-            render_element.add_section_band(self.content)
+
+            background_color = self.content.background_color
+            if not self.content.alternate_background_color.transparent and self.row_index % 2 == 1:
+                background_color = self.content.alternate_background_color
+            render_element.add_section_band(self.content, background_color=background_color)
             if not self.content.rendering_complete:
                 return render_element, False
             self.row_index += 1
@@ -1773,7 +1782,7 @@ class SectionElement(DocElement):
         if self.footer:
             self.footer.create_render_elements(
                 offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
-            render_element.add_section_band(self.footer)
+            render_element.add_section_band(self.footer, background_color=self.footer.background_color)
             if not self.footer.rendering_complete:
                 return render_element, False
 

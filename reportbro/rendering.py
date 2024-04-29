@@ -469,16 +469,26 @@ class SectionRenderElement(DocElementBase):
     def is_empty(self):
         return len(self.bands) == 0
 
-    def add_section_band(self, section_band):
+    def add_section_band(self, section_band, background_color):
         if section_band.rendering_complete or not section_band.always_print_on_same_page:
             band_height = section_band.get_render_bottom()
-            self.bands.append(dict(height=band_height, elements=list(section_band.get_render_elements())))
+            self.bands.append(dict(
+                width=section_band.width,
+                height=band_height,
+                background_color=background_color,
+                elements=list(section_band.get_render_elements())
+            ))
             self.height += band_height
             self.render_bottom += band_height
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         y = self.render_y + container_offset_y
         for band in self.bands:
+            if not band['background_color'].transparent:
+                pdf_doc.set_fill_color(
+                    band['background_color'].r, band['background_color'].g, band['background_color'].b)
+                pdf_doc.rect(container_offset_x, y, band['width'], band['height'], 'F')
+
             for element in band['elements']:
                 element.render_pdf(container_offset_x=container_offset_x, container_offset_y=y, pdf_doc=pdf_doc)
             y += band['height']
