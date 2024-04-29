@@ -1,5 +1,15 @@
 # Changelog
 
+## Upcoming Release
+
+### Features
+* Support background color for section bands
+* Support custom functions for evaluating expressions
+
+### Changes
+* Add "abs", "floor" and "ceil" to available functions for evaluating expressions
+* encode_error_handling setting is now also used for TrueType fonts (custom fonts)
+
 ## [3.7.1] - 2024-04-09
 
 ### Changes
