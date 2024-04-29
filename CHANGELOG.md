@@ -14,7 +14,7 @@
 
 ### Changes
 * Update dependencies
-* Use simpleeval instread of reportbro-simpleeval
+* Use simpleeval instead of reportbro-simpleeval
 
 ### Bug Fixes
 * Removed deprecation warning with python 3.11
