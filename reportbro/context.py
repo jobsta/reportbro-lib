@@ -7,6 +7,7 @@ from simpleeval import DEFAULT_FUNCTIONS as EVAL_DEFAULT_FUNCTIONS
 from typing import List, Optional
 import datetime
 import decimal
+import math
 
 from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
@@ -25,7 +26,7 @@ CONTEXT_ENTRY_PREV_ENTRY = 3
 
 
 class Context:
-    def __init__(self, report, parameters, data):
+    def __init__(self, report, parameters, data, custom_functions):
         self.report = report
         self.pattern_locale = report.document_properties.pattern_locale
         self.pattern_currency_symbol = report.document_properties.pattern_currency_symbol
@@ -40,7 +41,12 @@ class Context:
             format_datetime=self.format_datetime_func,
             format_decimal=self.format_decimal_func,
             len=len,
+            abs=abs,
+            floor=math.floor,
+            ceil=math.ceil,
         )
+        if custom_functions:
+            self.eval_functions.update(custom_functions)
         self.root_data = data
         self.root_data['page_number'] = 0
         self.root_data['page_count'] = 0

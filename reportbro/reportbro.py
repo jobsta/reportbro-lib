@@ -526,7 +526,8 @@ class Report:
     def __init__(self, report_definition, data, is_test_data=False, additional_fonts=None,
                  page_limit=10000, request_headers=None, encode_error_handling='strict',
                  core_fonts_encoding='windows-1252', spreadsheet_options=None,
-                 allow_local_image=True, allow_external_image=False):
+                 allow_local_image=True, allow_external_image=False,
+                 custom_functions=None):
         """Create Report instance which can then be used to generate pdf and xlsx reports.
 
         :param report_definition: The report object containg report elements, parameters,
@@ -563,6 +564,9 @@ class Report:
         :param allow_external_image: If set to True an image source can contain an external url. The image will be
         downloaded on the fly when rendering the spreadsheet. If set to False an error is thrown
         in case an url is specified for an image.
+        :param custom_functions: optional dict containing functions which can be used when an expression
+        is evaluated. The dict key is the function name and the value is a function with an arbitrary number
+        of arguments.
         """
         assert isinstance(report_definition, dict)
         assert isinstance(data, dict)
@@ -659,7 +663,7 @@ class Report:
                             self.errors.append(Error('errorMsgInvalidSize', object_id=elem.id, field='height'))
                     container.add(elem)
 
-            self.context = Context(self, self.parameters, self.data)
+            self.context = Context(self, self.parameters, self.data, custom_functions=custom_functions)
             self.process_data(dest_data=self.data, src_data=data, parameters=parameter_list,
                               is_test_data=is_test_data, parents=[])
 
