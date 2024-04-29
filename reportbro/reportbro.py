@@ -547,10 +547,11 @@ class Report:
         If set to 0 or None then no page limit is used.
         :param request_headers: request headers used when images are fetched by url
         :param encode_error_handling: defines behaviour when a character cannot
-        be encoded with the encoding used for the core fonts. The following options exist:
+        be encoded with the encoding used for the core fonts or when a character
+        is missing in a TrueType Font (custom font). The following options exist:
         - 'strict': raise a UnicodeDecodeError exception
         - 'ignore': just leave the character out of the result
-        - 'replace': use U+FFFD replacement character
+        - 'replace': use '?' as replacement character
         :param core_fonts_encoding: defines the encoding when using the core fonts.
         Default is 'windows-1252' which is usually the best choice for English and many European
         languages including Spanish, French, and German.
