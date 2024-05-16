@@ -5,6 +5,7 @@
 ### Features
 * Support background color for section bands
 * Support custom functions for evaluating expressions
+* Support options to set spreadsheet cell type and pattern
 
 ### Changes
 * Add "abs", "floor" and "ceil" to available functions for evaluating expressions
