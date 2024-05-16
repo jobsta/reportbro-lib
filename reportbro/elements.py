@@ -580,6 +580,19 @@ class TextElement(DocElement):
 
     def render_spreadsheet(self, row, col, ctx, renderer):
         content = self.text_lines[0] if self.text_lines else ''
+        if self.spreadsheet_type == SpreadsheetType.date:
+            try:
+                content = parse_datetime_string(content)
+            except (ValueError, TypeError):
+                raise ReportBroError(Error(
+                    msg_key='errorMsgInvalidSpreadsheetDate', object_id=self.id, field='spreadsheet_type'))
+        elif self.spreadsheet_type == SpreadsheetType.number:
+            try:
+                content = parse_number_string(content)
+            except decimal.InvalidOperation:
+                raise ReportBroError(Error(
+                    msg_key='errorMsgInvalidSpreadsheetNumber', object_id=self.id, field='spreadsheet_type'))
+
         cell_format = None
         if self.used_style.id not in self.spreadsheet_formats:
             format_props = dict()
@@ -614,25 +627,13 @@ class TextElement(DocElement):
                     format_props['right'] = 1
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
-            if self.spreadsheet_type != SpreadsheetType.none:
-                if self.spreadsheet_type == SpreadsheetType.date:
-                    try:
-                        content = parse_datetime_string(content)
-                    except (ValueError, TypeError):
-                        raise ReportBroError(Error(
-                            msg_key='errorMsgInvalidSpreadsheetDate', object_id=self.id, field='spreadsheet_type'))
-                elif self.spreadsheet_type == SpreadsheetType.number:
-                    try:
-                        content = parse_number_string(content)
-                    except decimal.InvalidOperation:
-                        raise ReportBroError(Error(
-                            msg_key='errorMsgInvalidSpreadsheetNumber', object_id=self.id, field='spreadsheet_type'))
-                if self.spreadsheet_pattern:
-                    format_props['num_format'] = self.spreadsheet_pattern
-                elif self.spreadsheet_type == SpreadsheetType.date:
-                    # use iso format as default when no pattern is specified for date parameter, otherwise
-                    # date is shown as a number
-                    format_props['num_format'] = 'yyyy-mm-dd'
+
+            if self.spreadsheet_pattern:
+                format_props['num_format'] = self.spreadsheet_pattern
+            elif self.spreadsheet_type == SpreadsheetType.date:
+                # use iso format as default when no pattern is specified for date parameter, otherwise
+                # date is shown as a number
+                format_props['num_format'] = 'yyyy-mm-dd'
             if self.spreadsheet_text_wrap:
                 format_props['text_wrap'] = True
             if format_props:
