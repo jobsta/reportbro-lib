@@ -189,15 +189,15 @@ class DocumentXLSXRenderer:
         if width > self.column_widths[col]:
             self.column_widths[col] = width
 
-    def write(self, row, col, colspan, text, cell_format, width, url=None):
+    def write(self, row, col, colspan, data, cell_format, width, url=None):
         if colspan > 1:
-            self.worksheet.merge_range(row, col, row, col + colspan - 1, text, cell_format)
+            self.worksheet.merge_range(row, col, row, col + colspan - 1, data, cell_format)
         elif not url:
-            self.worksheet.write(row, col, text, cell_format)
+            self.worksheet.write(row, col, data, cell_format)
             self.update_column_width(col, width)
         # url also works combined with colspan, the first cell of the range is simply overwritten
         if url:
-            self.worksheet.write_url(row, col, url, cell_format, text)
+            self.worksheet.write_url(row, col, url, cell_format, data)
 
     def insert_image(self, row, col, image_filename, image_data, width, url=None):
         options = dict()

@@ -1,4 +1,5 @@
 import datetime
+import decimal
 
 current_datetime_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
@@ -39,6 +40,10 @@ def parse_datetime_string(val):
     elif colon_count == 2:
         date_format = '%Y-%m-%d %H:%M:%S'
     return datetime.datetime.strptime(val, date_format)
+
+
+def parse_number_string(val):
+    return decimal.Decimal(val.replace(',', '.'))
 
 
 # return image size so image fits into configured width/height and keep aspect ratio

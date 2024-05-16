@@ -46,6 +46,12 @@ class ParameterType(Enum):
     image = 11
 
 
+class SpreadsheetType(Enum):
+    none = 0
+    number = 1
+    date = 2
+
+
 class BandType(Enum):
     header = 1
     content = 2

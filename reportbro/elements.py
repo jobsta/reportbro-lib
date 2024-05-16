@@ -19,7 +19,8 @@ from .errors import Error, ReportBroError, ReportBroInternalError
 from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, LineRenderElement,\
     TableRenderElement, FrameRenderElement, SectionRenderElement
 from .structs import BorderStyle, Color, ConditionalStyleRule, TextLinePart, TextStyle
-from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size
+from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size,\
+    parse_datetime_string, parse_number_string
 
 
 class ImageElement(DocElement):
@@ -368,6 +369,11 @@ class TextElement(DocElement):
         self.spreadsheet_column = get_int_value(data, 'spreadsheet_column')
         self.spreadsheet_colspan = get_int_value(data, 'spreadsheet_colspan')
         self.spreadsheet_add_empty_row = bool(data.get('spreadsheet_addEmptyRow'))
+        if data.get('spreadsheet_type'):
+            self.spreadsheet_type = SpreadsheetType[data.get('spreadsheet_type')]
+        else:
+            self.spreadsheet_type = SpreadsheetType.none
+        self.spreadsheet_pattern = get_str_value(data, 'spreadsheet_pattern')
         self.spreadsheet_text_wrap = bool(data.get('spreadsheet_textWrap'))
         self.spreadsheet_formats = dict()  # caching of formats for rendering spreadsheet
         self.text_height = 0
@@ -411,7 +417,12 @@ class TextElement(DocElement):
                                 Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
                 content = to_string(content)
             else:
-                content = self.fill_parameters(ctx)
+                if pdf_doc is None and self.spreadsheet_type != SpreadsheetType.none:
+                    # content is exported to spreadsheet with specific type -> use string representation of
+                    # parameter value so the content can be parsed for the type when spreadsheet is rendered
+                    content = ctx.fill_parameters(self.content, self.id, field='content', ignore_pattern=True)
+                else:
+                    content = self.fill_parameters(ctx)
 
             if self.link:
                 self.prepared_link = ctx.fill_parameters(self.link, self.id, field='link')
@@ -568,6 +579,7 @@ class TextElement(DocElement):
         return self.first_render_element
 
     def render_spreadsheet(self, row, col, ctx, renderer):
+        content = self.text_lines[0] if self.text_lines else ''
         cell_format = None
         if self.used_style.id not in self.spreadsheet_formats:
             format_props = dict()
@@ -602,6 +614,25 @@ class TextElement(DocElement):
                     format_props['right'] = 1
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
+            if self.spreadsheet_type != SpreadsheetType.none:
+                if self.spreadsheet_type == SpreadsheetType.date:
+                    try:
+                        content = parse_datetime_string(content)
+                    except (ValueError, TypeError):
+                        raise ReportBroError(Error(
+                            msg_key='errorMsgInvalidSpreadsheetDate', object_id=self.id, field='spreadsheet_type'))
+                elif self.spreadsheet_type == SpreadsheetType.number:
+                    try:
+                        content = parse_number_string(content)
+                    except decimal.InvalidOperation:
+                        raise ReportBroError(Error(
+                            msg_key='errorMsgInvalidSpreadsheetNumber', object_id=self.id, field='spreadsheet_type'))
+                if self.spreadsheet_pattern:
+                    format_props['num_format'] = self.spreadsheet_pattern
+                elif self.spreadsheet_type == SpreadsheetType.date:
+                    # use iso format as default when no pattern is specified for date parameter, otherwise
+                    # date is shown as a number
+                    format_props['num_format'] = 'yyyy-mm-dd'
             if self.spreadsheet_text_wrap:
                 format_props['text_wrap'] = True
             if format_props:
@@ -612,7 +643,6 @@ class TextElement(DocElement):
             cell_format = self.spreadsheet_formats[self.used_style.id]
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
-        content = self.text_lines[0] if self.text_lines else ''
         renderer.write(row, col, self.spreadsheet_colspan, content, cell_format,
                        self.width, url=self.prepared_link)
         if self.spreadsheet_add_empty_row:

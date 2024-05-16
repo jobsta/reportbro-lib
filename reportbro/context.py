@@ -183,7 +183,7 @@ class Context:
     def fill_parameters(
             self, expr: str, object_id: int, field: str, pattern: str = None,
             parameter_type: Optional[ParameterType] = None,
-            replaced_parameters: Optional[List[Parameter]] = None) -> str:
+            replaced_parameters: Optional[List[Parameter]] = None, ignore_pattern: bool = False) -> str:
         """
         Return a string where parameter references are replaced with parameter value. A parameter is referenced
         in the format "${parameter_name}".
@@ -195,6 +195,8 @@ class Context:
         used for all parameter references.
         :param parameter_type: if set then only parameters which match this type are replaced with the parameter value.
         :param replaced_parameters: if set then parameters which are replaced by its value are added to this list.
+        :param ignore_pattern: if True then all patterns (pattern parameter of this method and parameter pattern)
+        are ignored and parameters are replaced with the value of their default string representation.
         :return: string with replaced parameter references.
         """
         if expr.find('${') == -1:
@@ -237,7 +239,11 @@ class Context:
                                     value[:2] == '<p' and rv == '<p>' and expr[i + 1:] == '</p>':
                                 return value
                             else:
-                                rv += self.get_formatted_value(value, param_ref.parameter, object_id, pattern=pattern)
+                                if ignore_pattern:
+                                    rv = str(value)
+                                else:
+                                    rv += self.get_formatted_value(
+                                        value, param_ref.parameter, object_id, pattern=pattern)
                     else:
                         # parameter type is set and referenced parameter does not match type -> do not replace parameter
                         rv += '${' + parameter_name + '}'
