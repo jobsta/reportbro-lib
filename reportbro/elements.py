@@ -1679,7 +1679,7 @@ class SectionBandElement(object):
                     # minimum height is larger than available space, continue on next page
                     self.rendering_complete = False
                     self.prepare_container = False
-                    self.container.render_bottom += available_height
+                    self.container.render_bottom = available_height
             else:
                 self.prepare_container = True
         else:
@@ -1693,6 +1693,7 @@ class SectionBandElement(object):
                         Error('errorMsgSectionBandNotOnSamePage', object_id=self.id, field=field))
             else:
                 self.prepare_container = False
+                self.container.render_bottom = available_height
 
     def get_render_bottom(self):
         return self.container.render_bottom
