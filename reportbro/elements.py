@@ -629,7 +629,10 @@ class TextElement(DocElement):
                     format_props['bottom'] = 1
 
             if self.spreadsheet_pattern:
-                format_props['num_format'] = self.spreadsheet_pattern
+                num_format = self.spreadsheet_pattern
+                if '$' in num_format:
+                    num_format = num_format.replace('$', '[$' + ctx.pattern_currency_symbol + ']')
+                format_props['num_format'] = num_format
             elif self.spreadsheet_type == SpreadsheetType.date:
                 # use iso format as default when no pattern is specified for date parameter, otherwise
                 # date is shown as a number
