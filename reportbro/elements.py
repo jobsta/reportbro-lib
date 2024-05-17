@@ -372,7 +372,7 @@ class TextElement(DocElement):
         if data.get('spreadsheet_type'):
             self.spreadsheet_type = SpreadsheetType[data.get('spreadsheet_type')]
         else:
-            self.spreadsheet_type = SpreadsheetType.none
+            self.spreadsheet_type = SpreadsheetType.default
         self.spreadsheet_pattern = get_str_value(data, 'spreadsheet_pattern')
         self.spreadsheet_text_wrap = bool(data.get('spreadsheet_textWrap'))
         self.spreadsheet_formats = dict()  # caching of formats for rendering spreadsheet
@@ -417,7 +417,7 @@ class TextElement(DocElement):
                                 Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
                 content = to_string(content)
             else:
-                if pdf_doc is None and self.spreadsheet_type != SpreadsheetType.none:
+                if pdf_doc is None and self.spreadsheet_type != SpreadsheetType.default:
                     # content is exported to spreadsheet with specific type -> use string representation of
                     # parameter value so the content can be parsed for the type when spreadsheet is rendered
                     content = ctx.fill_parameters(self.content, self.id, field='content', ignore_pattern=True)
@@ -628,7 +628,7 @@ class TextElement(DocElement):
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
 
-            if self.spreadsheet_pattern:
+            if self.spreadsheet_type != SpreadsheetType.default and self.spreadsheet_pattern:
                 num_format = self.spreadsheet_pattern
                 if '$' in num_format:
                     num_format = num_format.replace('$', '[$' + ctx.pattern_currency_symbol + ']')
@@ -637,8 +637,10 @@ class TextElement(DocElement):
                 # use iso format as default when no pattern is specified for date parameter, otherwise
                 # date is shown as a number
                 format_props['num_format'] = 'yyyy-mm-dd'
+
             if self.spreadsheet_text_wrap:
                 format_props['text_wrap'] = True
+
             if format_props:
                 cell_format = renderer.add_format(format_props)
                 self.spreadsheet_formats[self.used_style.id] = cell_format

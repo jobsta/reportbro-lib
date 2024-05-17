@@ -47,7 +47,7 @@ class ParameterType(Enum):
 
 
 class SpreadsheetType(Enum):
-    none = 0
+    default = 0
     number = 1
     date = 2
 
