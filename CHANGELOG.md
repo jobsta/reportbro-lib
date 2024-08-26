@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.0] - 2024-08-27
+
+### Features
+* Support watermark texts and images with rotation and transparency (PLUS version)
+
+### Changes
+* Store fonts with lowercase name to allow case independent font access
+
 ## [3.8.0] - 2024-05-23
 
 ### Features
