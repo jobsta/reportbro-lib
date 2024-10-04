@@ -1,5 +1,12 @@
 # Changelog
 
+## Upcoming Release
+
+### Changes
+* Support setting to show watermark in foreground
+* Use attributes from linked style instead of attributes set on element (allows changing style data
+independent of Designer)
+
 ## [3.9.0] - 2024-08-27
 
 ### Features
