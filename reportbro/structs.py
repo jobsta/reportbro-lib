@@ -324,6 +324,91 @@ class TextStyle(BorderStyle):
             self.padding_bottom += self.border_width
 
 
+class LineStyle:
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing line style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.color = Color(data.get('color'))
+
+
+class ImageStyle:
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing image style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment')]
+        self.vertical_alignment = VerticalAlignment[data.get('verticalAlignment')]
+        self.background_color = Color(data.get('backgroundColor'))
+
+
+class TableStyle:
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing table style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.border = Border[data.get('border')]
+        self.border_color = Color(data.get('borderColor'))
+        self.border_width = get_float_value(data, 'borderWidth')
+
+
+class TableBandStyle:
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing table band style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.background_color = Color(data.get('backgroundColor'))
+        self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
+
+
+class FrameStyle(BorderStyle):
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing frame style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        BorderStyle.__init__(self, data)
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.background_color = Color(data.get('backgroundColor'))
+
+
+class SectionBandStyle:
+    def __init__(self, data, id_suffix=''):
+        """
+        :param data: dict containing section band style values
+        :param id_suffix: if set then the id_suffix is appended to the id. this is used for
+        styles stored within an element to avoid id collision with an existing style.
+        """
+        self.id = str(get_int_value(data, 'id'))
+        if id_suffix:
+            self.id += id_suffix
+        self.background_color = Color(data.get('backgroundColor'))
+        self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
+
+
 class ConditionalStyleRule:
     def __init__(self, report, data, object_id, rule_nr):
         self.report = report

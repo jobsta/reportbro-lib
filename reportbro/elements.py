@@ -18,7 +18,8 @@ from .enums import *
 from .errors import Error, ReportBroError, ReportBroInternalError
 from .rendering import BarCodeRenderElement, BarcodeSVGWriter, ImageRenderElement, LineRenderElement,\
     TableRenderElement, FrameRenderElement, SectionRenderElement
-from .structs import BorderStyle, Color, ConditionalStyleRule, TextLinePart, TextStyle
+from .structs import Color, ConditionalStyleRule, FrameStyle, ImageStyle, LineStyle, SectionBandStyle,\
+    TableBandStyle, TableStyle, TextLinePart, TextStyle
 from .utils import get_float_value, get_int_value, get_str_value, to_string, get_image_display_size,\
     parse_datetime_string, parse_number_string
 
@@ -29,9 +30,14 @@ class ImageElement(DocElement):
         self.source = get_str_value(data, 'source')
         self.image = get_str_value(data, 'image')
         self.image_filename = get_str_value(data, 'imageFilename')
-        self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment')]
-        self.vertical_alignment = VerticalAlignment[data.get('verticalAlignment')]
-        self.background_color = Color(data.get('backgroundColor'))
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for image element {self.id} not found', log_error=False)
+            self.style = style
+        else:
+            self.style = ImageStyle(data, id_suffix='_image')
+
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.link = get_str_value(data, 'link')
@@ -285,8 +291,14 @@ class BarCodeElement(DocElement):
 class LineElement(DocElement):
     def __init__(self, report, data):
         DocElement.__init__(self, report, data)
-        self.color = Color(data.get('color'))
         self.print_if = get_str_value(data, 'printIf')
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for line element {self.id} not found', log_error=False)
+            self.style = style
+        else:
+            self.style = LineStyle(data, id_suffix='_line')
 
     def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.render_y = offset_y
@@ -324,7 +336,7 @@ class TextElement(DocElement):
         if data.get('styleId'):
             style = report.styles.get(get_int_value(data, 'styleId'))
             if style is None:
-                raise ReportBroInternalError(f'Style for text element {self.id} not found')
+                raise ReportBroInternalError(f'Style for text element {self.id} not found', log_error=False)
             self.style = style
         else:
             self.style = TextStyle(data, id_suffix='_text')
@@ -916,12 +928,17 @@ class TableElement(DocElement):
             self.footer = TableBandElement(report, data.get('footerData'), BandType.footer)
             if column_count is not None:
                 assert column_count == len(self.footer.cells)
-
         self.print_header = False
         self.print_footer = False
-        self.border = Border[data.get('border')]
-        self.border_color = Color(data.get('borderColor'))
-        self.border_width = get_float_value(data, 'borderWidth')
+
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for table element {self.id} not found', log_error=False)
+            self.style = style
+        else:
+            self.style = TableStyle(data, id_suffix='_table')
+
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
@@ -1227,6 +1244,14 @@ class TableBandElement(object):
             self.repeat_header = bool(data.get('repeatHeader'))
         else:
             self.repeat_header = None
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for table band element {self.id} not found', log_error=False)
+            self.style = style
+        else:
+            self.style = TableBandStyle(data, id_suffix='_table_band')
+
         self.background_color = Color(data.get('backgroundColor'))
         self.print_if = get_str_value(data, 'printIf')
         self.before_group = before_group
@@ -1234,7 +1259,6 @@ class TableBandElement(object):
         self.repeat_group_header = None
         if band_type == BandType.content:
             self.group_expression = get_str_value(data, 'groupExpression')
-            self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
             self.always_print_on_same_page = bool(data.get('alwaysPrintOnSamePage'))
             if self.group_expression:
                 if not data_source_available:
@@ -1248,7 +1272,6 @@ class TableBandElement(object):
                         'errorMsgRepeatGroupHeaderAfterContent', object_id=self.id, field='repeatGroupHeader'))
         else:
             self.group_expression = None
-            self.alternate_background_color = None
             self.always_print_on_same_page = True
         self.cells = []  # cells created from initial data as defined in Designer
         self.print_if_result = True
@@ -1406,10 +1429,10 @@ class TableBandElement(object):
         # elements in container must be prepared for each row before spreadsheet can be rendered
         self.container.prepare(ctx, pdf_doc=None)
 
-        background_color = self.background_color
-        if self.band_type == BandType.content and not self.alternate_background_color.transparent and\
+        background_color = self.style.background_color
+        if self.band_type == BandType.content and not self.style.alternate_background_color.transparent and\
                 row_index % 2 == 1:
-            background_color = self.alternate_background_color
+            background_color = self.style.alternate_background_color
             style_id_suffix = '_alt_table_row'
         else:
             style_id_suffix = '_table_row'
@@ -1487,8 +1510,13 @@ class FrameElement(DocElement):
     def __init__(self, report, data, containers):
         DocElement.__init__(self, report, data)
         from .containers import Frame
-        self.background_color = Color(data.get('backgroundColor'))
-        self.border_style = BorderStyle(data)
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for frame element {self.id} not found', log_error=False)
+            self.style = style
+        else:
+            self.style = FrameStyle(data, id_suffix='_frame')
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
@@ -1509,10 +1537,10 @@ class FrameElement(DocElement):
 
     def get_render_bottom(self):
         height = self.container.render_bottom
-        if self.border_style.border_top and self.render_element_type == RenderElementType.none:
-            height += self.border_style.border_width
-        if self.border_style.border_bottom:
-            height += self.border_style.border_width
+        if self.style.border_top and self.render_element_type == RenderElementType.none:
+            height += self.style.border_width
+        if self.style.border_bottom:
+            height += self.style.border_width
         if self.render_element_type == RenderElementType.none and not self.shrink_to_content_height:
             height = max(self.height, height)
         return height
@@ -1529,14 +1557,14 @@ class FrameElement(DocElement):
         content_height = container_height
         render_element = FrameRenderElement(self.report, self, render_y=offset_y)
 
-        if self.border_style.border_top and self.render_element_type == RenderElementType.none:
-            content_height -= self.border_style.border_width
-        if self.border_style.border_bottom:
+        if self.style.border_top and self.render_element_type == RenderElementType.none:
+            content_height -= self.style.border_width
+        if self.style.border_bottom:
             # this is not 100% correct because bottom border is only applied if frame fits
             # on current page. this should be negligible because the border is usually only a few pixels
             # and most of the time the frame fits on one page.
             # to get the exact height in advance would be quite hard and is probably not worth the effort ...
-            content_height -= self.border_style.border_width
+            content_height -= self.style.border_width
 
         if self.first_render_element:
             self.first_render_element = False
@@ -1629,11 +1657,14 @@ class SectionBandElement(object):
             report.document_properties.margin_left - report.document_properties.margin_right
         self.height = get_int_value(data, 'height')
         self.band_type = band_type
-        self.background_color = Color(data.get('backgroundColor'))
-        if band_type == BandType.content:
-            self.alternate_background_color = Color(data.get('alternateBackgroundColor'))
+        if data.get('styleId'):
+            style = report.styles.get(get_int_value(data, 'styleId'))
+            if style is None:
+                raise ReportBroInternalError(f'Style for section element {self.id} not found', log_error=False)
+            self.style = style
         else:
-            self.alternate_background_color = None
+            self.style = SectionBandStyle(data, id_suffix='_section_band')
+
         if band_type == BandType.header:
             self.repeat_header = bool(data.get('repeatHeader'))
             self.always_print_on_same_page = True
@@ -1787,7 +1818,7 @@ class SectionElement(DocElement):
 
         if self.print_header:
             self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
-            render_element.add_section_band(self.header, background_color=self.header.background_color)
+            render_element.add_section_band(self.header, background_color=self.header.style.background_color)
             if not self.header.rendering_complete:
                 return render_element, False
             if not self.header.repeat_header:
@@ -1800,9 +1831,9 @@ class SectionElement(DocElement):
                 offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
             ctx.pop_context()
 
-            background_color = self.content.background_color
-            if not self.content.alternate_background_color.transparent and self.row_index % 2 == 1:
-                background_color = self.content.alternate_background_color
+            background_color = self.content.style.background_color
+            if not self.content.style.alternate_background_color.transparent and self.row_index % 2 == 1:
+                background_color = self.content.style.alternate_background_color
             render_element.add_section_band(self.content, background_color=background_color)
             if not self.content.rendering_complete:
                 return render_element, False
@@ -1819,7 +1850,7 @@ class SectionElement(DocElement):
         if self.footer:
             self.footer.create_render_elements(
                 offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
-            render_element.add_section_band(self.footer, background_color=self.footer.background_color)
+            render_element.add_section_band(self.footer, background_color=self.footer.style.background_color)
             if not self.footer.rendering_complete:
                 return render_element, False
 

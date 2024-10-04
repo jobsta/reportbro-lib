@@ -15,9 +15,9 @@ class ImageRenderElement(DocElementBase):
         self.height = image.height
         self.render_y = render_y
         self.render_bottom = render_y + self.height
-        self.background_color = image.background_color
-        self.horizontal_alignment = image.horizontal_alignment
-        self.vertical_alignment = image.vertical_alignment
+        self.horizontal_alignment = image.style.horizontal_alignment
+        self.vertical_alignment = image.style.vertical_alignment
+        self.background_color = image.style.background_color
         self.prepared_link = image.prepared_link
         self.source = image.source
         self.image_filename = image.image_filename
@@ -273,7 +273,7 @@ class LineRenderElement(DocElementBase):
         self.render_y = render_y
         self.width = line.width
         self.height = line.height
-        self.color = line.color
+        self.color = line.style.color
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         pdf_doc.set_draw_color(self.color.r, self.color.g, self.color.b)
@@ -302,10 +302,10 @@ class TableRenderElement(DocElementBase):
     def add_band(self, band, row_index=-1):
         if band.rendering_complete or not band.always_print_on_same_page:
             band_height = band.get_render_bottom()
-            background_color = band.background_color
-            if band.band_type == BandType.content and not band.alternate_background_color.transparent and\
+            background_color = band.style.background_color
+            if band.band_type == BandType.content and not band.style.alternate_background_color.transparent and\
                     row_index % 2 == 1:
-                background_color = band.alternate_background_color
+                background_color = band.style.alternate_background_color
 
             self.bands.append(dict(
                 height=band_height, background_color=background_color,
@@ -330,28 +330,28 @@ class TableRenderElement(DocElementBase):
                 element.render_pdf(container_offset_x=x, container_offset_y=row_y, pdf_doc=pdf_doc)
             row_y += band['height']
 
-        if not self.is_empty() and self.table.border != Border.none:
+        if not self.is_empty() and self.table.style.border != Border.none:
             pdf_doc.set_draw_color(
-                self.table.border_color.r, self.table.border_color.g, self.table.border_color.b)
-            pdf_doc.set_line_width(self.table.border_width)
-            half_border_width = self.table.border_width / 2
+                self.table.style.border_color.r, self.table.style.border_color.g, self.table.style.border_color.b)
+            pdf_doc.set_line_width(self.table.style.border_width)
+            half_border_width = self.table.style.border_width / 2
             x1 += half_border_width
             x2 -= half_border_width
             y1 = y
             y2 = row_y
-            if self.table.border in (Border.grid, Border.frame_row, Border.frame):
+            if self.table.style.border in (Border.grid, Border.frame_row, Border.frame):
                 # draw left and right table borders
                 pdf_doc.line(x1, y1, x1, y2)
                 pdf_doc.line(x2, y1, x2, y2)
             y = y1
             pdf_doc.line(x1, y1, x2, y1)
-            if self.table.border != Border.frame:
+            if self.table.style.border != Border.frame:
                 # draw lines between table rows
                 for band in self.bands[:-1]:
                     y += band['height']
                     pdf_doc.line(x1, y, x2, y)
             pdf_doc.line(x1, y2, x2, y2)
-            if self.table.border == Border.grid:
+            if self.table.style.border == Border.grid:
                 # draw lines between table columns
                 cells = self.bands[0]['cells']
                 # add half border_width so border is drawn inside right cell and
@@ -397,8 +397,8 @@ class FrameRenderElement(DocElementBase):
         self.report = report
         self.x = frame.x
         self.width = frame.width
-        self.border_style = frame.border_style
-        self.background_color = frame.background_color
+        self.border_style = frame.style
+        self.background_color = frame.style.background_color
         self.render_y = render_y
         self.render_bottom = render_y
         self.height = 0
