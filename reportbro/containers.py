@@ -69,6 +69,24 @@ class Container(object):
         self.render_elements = []
         self.render_bottom = 0
 
+    def get_offset_y(self, doc_element):
+        """
+        Return y offset for given element on page. The offset is relative to the predecessor elements
+        on the page, i.e. if a predecessor element is expanded the element is moved down relative to the
+        predecessor.
+        """
+        if doc_element.predecessors:
+            # element is on same page as predecessor element(s) so offset is relative to predecessors
+            offset_y = doc_element.get_offset_y()
+        else:
+            if doc_element.first_render_element:
+                offset_y = doc_element.y - self.first_element_offset_y
+                if offset_y < 0:
+                    offset_y = 0
+            else:
+                offset_y = 0
+        return offset_y
+
     def create_render_elements(self, container_top, container_height, ctx, pdf_doc):
         i = 0
         new_page = False
@@ -97,16 +115,7 @@ class Container(object):
                         return True
                 else:
                     complete = False
-                    if elem.predecessors:
-                        # element is on same page as predecessor element(s) so offset is relative to predecessors
-                        offset_y = elem.get_offset_y()
-                    else:
-                        if elem.first_render_element:
-                            offset_y = elem.y - self.first_element_offset_y
-                            if offset_y < 0:
-                                offset_y = 0
-                        else:
-                            offset_y = 0
+                    offset_y = self.get_offset_y(elem)
 
                     if elem.is_printed(ctx):
                         if offset_y >= container_height:
