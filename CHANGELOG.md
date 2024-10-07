@@ -1,11 +1,14 @@
 # Changelog
 
-## Upcoming Release
+## [3.9.2] - 2024-10-07
 
 ### Changes
-* Support setting to show watermark in foreground
+* Support setting to show watermark in foreground (PLUS version)
 * Use attributes from linked style instead of attributes set on element (allows changing style data
 independent of Designer)
+
+### Bug Fixes
+* Fix calculating y-offset for watermark elements (use absolute position on page)
 
 ## [3.9.0] - 2024-08-27
 
