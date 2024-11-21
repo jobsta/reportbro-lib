@@ -23,6 +23,7 @@ import urllib.parse
 import xlsxwriter
 from copy import deepcopy
 from babel import Locale
+from babel.core import UnknownLocaleError
 from datetime import datetime
 from io import BufferedReader, IOBase
 from urllib import request
@@ -275,14 +276,15 @@ class DocumentProperties:
         self.margin_bottom = get_int_value(data, 'marginBottom')
         self.pattern_locale = data.get('patternLocale', '')
         self.pattern_currency_symbol = data.get('patternCurrencySymbol', '')
-        if self.pattern_locale not in ('de', 'en', 'es', 'fr', 'it'):
+        try:
+            rbro_locale = Locale.parse(self.pattern_locale)
+        except (UnknownLocaleError, ValueError, TypeError):
             raise ReportBroInternalError('invalid pattern_locale', log_error=False)
         self.pattern_number_group_symbol = data.get('patternNumberGroupSymbol', '')
         if self.pattern_number_group_symbol and len(self.pattern_number_group_symbol) > 1:
             raise ReportBroInternalError('invalid pattern_number_group_symbol', log_error=False)
 
         if self.pattern_number_group_symbol:
-            rbro_locale = Locale(self.pattern_locale)
             rbro_locale.number_symbols  # ensure instance has been populated
             self.pattern_locale = deepcopy(rbro_locale)
             self.pattern_locale.number_symbols['latn']['group'] = self.pattern_number_group_symbol
