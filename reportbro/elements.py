@@ -668,8 +668,9 @@ class TextElement(DocElement):
         return row + 1, col + (self.spreadsheet_colspan if self.spreadsheet_colspan else 1)
 
     def set_font_by_style(self, style, pdf_doc):
-        if not pdf_doc.set_font(
-                style.font, style.font_style, style.font_size, underline=style.underline):
+        font = pdf_doc.set_font(
+            style.font, style.font_style, style.font_size, underline=style.underline, strikethrough=style.strikethrough)
+        if font is None:
             if self.rich_text:
                 msg_key = 'errorMsgInvalidRichTextFontNotAvailable'
                 error_field = 'richTextContent'
@@ -677,20 +678,30 @@ class TextElement(DocElement):
                 msg_key = 'errorMsgFontNotAvailable'
                 error_field = style.key_prefix + 'font'
             raise ReportBroError(Error(msg_key=msg_key, object_id=self.id, field=error_field))
+        return font['text_shaping']
 
     def split_text_lines(self, content, available_width, ctx, pdf_doc):
         if content is not None:
-            self.set_font_by_style(self.used_style, pdf_doc)
+            use_text_shaping = self.set_font_by_style(self.used_style, pdf_doc)
+            pdf_doc.set_text_color(
+                self.used_style.text_color.r, self.used_style.text_color.g, self.used_style.text_color.b)
             try:
-                lines = pdf_doc.split_text(first_w=available_width, w=available_width, txt=content)
+                if use_text_shaping:
+                    raise ReportBroError(Error('errorMsgPlusVersionRequired', object_id=self.id, field='content'))
+                else:
+                    lines = pdf_doc.split_text(first_w=available_width, w=available_width, txt=content)
             except UnicodeEncodeError:
                 raise ReportBroError(
                     Error('errorMsgUnicodeEncodeError', object_id=self.id, field='content', context=self.content))
             for line in lines:
+                parsed_line = line if use_text_shaping else None
                 text_line = TextLine(
-                    width=available_width, style=self.used_style, link=self.prepared_link, object_id=self.id)
-                text, text_width, _ = line
-                text_line.add_text(text, text_width, self.used_style)
+                    parsed_line=parsed_line, width=available_width, style=self.used_style,
+                    link=self.prepared_link, object_id=self.id,
+                )
+                if not use_text_shaping:
+                    text, text_width, _ = line
+                    text_line.add_text(text, text_width, self.used_style)
                 self.text_lines.append(text_line)
         else:
             raise ReportBroError(Error('errorMsgPlusVersionRequired', object_id=self.id, field='richText'))
@@ -742,7 +753,8 @@ class TextBlockElement(DocElementBase):
 
 
 class TextLine(object):
-    def __init__(self, width, style, link=None, object_id=None):
+    def __init__(self, parsed_line, width, style, link=None, object_id=None):
+        self.parsed_line = parsed_line
         self.available_width = width
         self.width = 0
         self.height = 0
@@ -757,7 +769,11 @@ class TextLine(object):
         self.text = TextLinePart(text, text_width, style, link)
 
     def setup(self):
-        self.width = self.text.width
+        assert self.text
+        if self.text:
+            self.width = self.text.width
+        else:
+            self.width = self.parsed_line.text_width
         max_font_size = self.style.font_size
         self.baseline_offset_y = max_font_size * 0.8
         self.height = max_font_size if self.last_line else (max_font_size * self.style.line_spacing)

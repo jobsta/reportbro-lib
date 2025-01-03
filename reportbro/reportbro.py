@@ -425,19 +425,21 @@ class FPDFRB(fpdf.FPDF):
             orientation = 'L'
             dimension = (document_properties.page_height, document_properties.page_width)
         fpdf.FPDF.__init__(self, orientation=orientation, unit='pt', format=dimension)
+        # page breaks are handled by reportbro
+        fpdf.FPDF.set_auto_page_break(self, False)
         self.x = 0
         self.y = 0
         self.core_fonts_encoding = core_fonts_encoding
         self.encode_error_handling = encode_error_handling
         self.loaded_images = dict()
         self.available_fonts = dict(
-            courier=dict(standard_font=True),
-            helvetica=dict(standard_font=True),
-            times=dict(standard_font=True))
+            courier=dict(standard_font=True, text_shaping=False),
+            helvetica=dict(standard_font=True, text_shaping=False),
+            times=dict(standard_font=True, text_shaping=False))
         if additional_fonts:
             for additional_font in additional_fonts:
                 filename = additional_font.get('filename', '')
-                font = dict(standard_font=False)
+                font = dict(standard_font=False, text_shaping=False)
 
                 regular_style = dict(
                     font_filename=filename, style='', font_added=False)
@@ -477,7 +479,12 @@ class FPDFRB(fpdf.FPDF):
     def get_image(self, image_key):
         return self.loaded_images.get(image_key)
 
-    def set_font(self, family=None, style='', size=0, underline=False):
+    def get_font(self, family):
+        font_name = family.lower()
+        # fonts are stored with lowercase font name
+        return self.available_fonts.get(font_name)
+
+    def set_font(self, family=None, style='', size=0, underline=False, strikethrough=False):
         """Set font in underlying pdf renderer.
 
         This font is used for all following text rendering calls until changed again.
@@ -489,7 +496,8 @@ class FPDFRB(fpdf.FPDF):
         letters among B (bold), I (italic) and U (underline).
         :param size: font size, if not set then the standard font size is used.
         :param underline: True if text should be rendered with underlined style.
-        :return: True if font exists, False otherwise.
+        :param strikethrough: True if text should be rendered with a strikethrough.
+        :return: font or None if font for given name does not exist.
         """
         font_name = family.lower()
         # fonts are stored with lowercase font name
@@ -513,14 +521,17 @@ class FPDFRB(fpdf.FPDF):
 
             if underline:
                 style += 'U'
-            fpdf.FPDF.set_font(self, family, style, size)
-            return True
-        else:
-            return False
+            if strikethrough:
+                style += 'S'
 
-    def print_text(self, x, y, text, object_id, field):
+            fpdf.FPDF.set_font(self, family, style, size)
+            return font
+        else:
+            return None
+
+    def print_text(self, x, y, text_line, link='', object_id=-1, field=''):
         try:
-            fpdf.FPDF.text(self, x, y, text)
+            fpdf.FPDF.text(self, x, y, text_line)
         except fpdf.FPDFException:
             raise ReportBroError(Error('errorMsgMissingGlyph', object_id=object_id, field=field))
 
