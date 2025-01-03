@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import time
 from tests.test_report_render import ReportRenderTest, DEMOS, GUIDES, MISC_TESTS
 
 if __name__ == "__main__":
@@ -14,6 +15,7 @@ if __name__ == "__main__":
     report_name = args.report_name
     overwrite = not args.keep
 
+    start = time.process_time_ns()
     if not group_name or group_name == 'demos':
         for test in DEMOS:
             if not report_name or test == report_name:
@@ -29,3 +31,6 @@ if __name__ == "__main__":
             if not report_name or test == report_name:
                 ReportRenderTest('misc', test).update_report_output(
                     update_file=True, update_checksum=False, overwrite=overwrite)
+    end = time.process_time_ns()
+    used_cpu_time = int((end - start) / 1000000)  # convert from ns to ms
+    print(f'report(s) generated in {used_cpu_time} milliseconds')
