@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.10.0] - 2025-01-03
+
+### Changes
+* Allow usage of arbitrary valid pattern locale
+
+### Bug Fixes
+* Fix text rendering with activated text shaping (PLUS version)
+
 ## [3.9.2] - 2024-10-07
 
 ### Changes
