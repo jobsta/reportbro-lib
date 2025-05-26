@@ -156,6 +156,7 @@ class BarCodeElement(DocElement):
             self.error_correction_level = qrcode.ERROR_CORRECT_H
         elif error_correction_level == 'Q':
             self.error_correction_level = qrcode.ERROR_CORRECT_Q
+        self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment', 'left')]
         self.print_if = data.get('printIf', '')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
@@ -260,6 +261,8 @@ class BarCodeElement(DocElement):
             # if barcode is rotated and value is shown then the rendered height is the larger value of
             # barcode width and value text width
             height = self.barcode_width if self.barcode_width > content_width else content_width
+            if self.height > height:
+                height = self.height
         else:
             # make sure barcode fits inside available space of container when barcode width depends on barcode value
             if self.format in ('code39', 'code128'):
@@ -275,6 +278,8 @@ class BarCodeElement(DocElement):
             self.render_bottom = offset_y + height
             self.rendering_complete = True
             return BarCodeRenderElement(self.report, offset_y, content_width=content_width, barcode=self), True
+        if offset_y == 0:
+            raise ReportBroError(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
         return None, False
 
     def render_spreadsheet(self, row, col, ctx, renderer):

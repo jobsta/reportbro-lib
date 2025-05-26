@@ -626,6 +626,7 @@ class Report:
                 for doc_element in report_definition.get('docElements'):
                     if DocElementType[doc_element.get('elementType')] == DocElementType.table:
                         doc_element['contentDataRows'] = [doc_element.get('contentData')]
+        report_definition['version'] = 6
 
         # list is needed to compute parameters (parameters with expression) in given order
         parameter_list = []
