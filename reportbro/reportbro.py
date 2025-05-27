@@ -254,7 +254,7 @@ class DocumentProperties:
             if unit == Unit.mm:
                 if self.page_width < 30 or self.page_width >= 100000:
                     self.report.errors.append(Error('errorMsgInvalidPageSize', object_id=self.id, field='pageWidth'))
-                elif self.page_height < 30 or self.page_height >= 100000:
+                elif self.page_height < 10 or self.page_height >= 100000:
                     self.report.errors.append(Error('errorMsgInvalidPageSize', object_id=self.id, field='pageHeight'))
             elif unit == Unit.inch:
                 if self.page_width < 1 or self.page_width >= 1000:
