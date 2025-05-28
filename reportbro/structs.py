@@ -223,9 +223,10 @@ class Parameter:
 
 
 class BorderStyle:
-    def __init__(self, data, key_prefix=''):
+    def __init__(self, report, data, key_prefix=''):
         self.border_color = Color(data.get(key_prefix + 'borderColor'))
         self.border_width = get_float_value(data, key_prefix + 'borderWidth')
+        self.border_radius = get_int_value(data, key_prefix + 'borderRadius')
         self.border_all = bool(data.get(key_prefix + 'borderAll'))
         self.border_left = self.border_all or bool(data.get(key_prefix + 'borderLeft'))
         self.border_top = self.border_all or bool(data.get(key_prefix + 'borderTop'))
@@ -242,8 +243,9 @@ class TextLinePart:
 
 
 class TextStyle(BorderStyle):
-    def __init__(self, data, key_prefix='', id_suffix=''):
+    def __init__(self, report, data, key_prefix='', id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing text style values
         :param key_prefix: optional prefix to access data values. this is used for conditional style
         values where the values are stored within an element. The conditional style value keys contain
@@ -251,9 +253,10 @@ class TextStyle(BorderStyle):
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         (conditional) styles stored within an element to avoid id collision with an existing style.
         """
-        BorderStyle.__init__(self, data, key_prefix)
+        BorderStyle.__init__(self, report, data, key_prefix)
         self.key_prefix = key_prefix
-        self.id = str(get_int_value(data, 'id'))
+        object_id = get_int_value(data, 'id')
+        self.id = str(object_id)
         if id_suffix:
             self.id += id_suffix
         self.bold = bool(data.get(key_prefix + 'bold'))
@@ -286,6 +289,12 @@ class TextStyle(BorderStyle):
         elif self.horizontal_alignment == HorizontalAlignment.justify:
             self.text_align = 'J'
         self.add_border_padding()
+
+        if self.border_radius:
+            has_border = self.border_left or self.border_top or self.border_right or self.border_bottom
+            if (not self.border_all and has_border) or (not has_border and self.background_color.transparent):
+                report.errors.append(
+                    Error('errorMsgBorderRadiusNotAllowed', object_id=object_id, field=key_prefix + 'borderRadius'))
 
     def set_bold(self, bold):
         """
@@ -325,7 +334,7 @@ class TextStyle(BorderStyle):
 
 
 class LineStyle:
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
         :param data: dict containing line style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
@@ -338,8 +347,9 @@ class LineStyle:
 
 
 class ImageStyle:
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing image style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         styles stored within an element to avoid id collision with an existing style.
@@ -353,8 +363,9 @@ class ImageStyle:
 
 
 class TableStyle:
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing table style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         styles stored within an element to avoid id collision with an existing style.
@@ -368,8 +379,9 @@ class TableStyle:
 
 
 class TableBandStyle:
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing table band style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         styles stored within an element to avoid id collision with an existing style.
@@ -382,22 +394,31 @@ class TableBandStyle:
 
 
 class FrameStyle(BorderStyle):
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing frame style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         styles stored within an element to avoid id collision with an existing style.
         """
-        BorderStyle.__init__(self, data)
-        self.id = str(get_int_value(data, 'id'))
+        BorderStyle.__init__(self, report, data)
+        object_id = get_int_value(data, 'id')
+        self.id = str(object_id)
         if id_suffix:
             self.id += id_suffix
         self.background_color = Color(data.get('backgroundColor'))
 
+        if self.border_radius:
+            has_border = self.border_left or self.border_top or self.border_right or self.border_bottom
+            if (not self.border_all and has_border) or (not has_border and self.background_color.transparent):
+                report.errors.append(
+                    Error('errorMsgBorderRadiusNotAllowed', object_id=object_id, field='borderRadius'))
+
 
 class SectionBandStyle:
-    def __init__(self, data, id_suffix=''):
+    def __init__(self, report, data, id_suffix=''):
         """
+        :param report: report instance
         :param data: dict containing section band style values
         :param id_suffix: if set then the id_suffix is appended to the id. this is used for
         styles stored within an element to avoid id collision with an existing style.
