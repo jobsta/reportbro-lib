@@ -208,6 +208,7 @@ class BarCodeRenderElement(DocElementBase):
         self.barcode_height = barcode.barcode_height
         self.rotate = barcode.rotate
         self.horizontal_alignment = barcode.horizontal_alignment
+        self.vertical_alignment = barcode.vertical_alignment
         if barcode.rotate:
             self.total_space = barcode.height
             render_height = barcode.barcode_width if barcode.barcode_width > content_width else content_width
@@ -225,14 +226,18 @@ class BarCodeRenderElement(DocElementBase):
         x = self.x + container_offset_x
         y = self.render_y + container_offset_y
         offset = 0
-        if self.horizontal_alignment == HorizontalAlignment.center:
-            offset = (self.total_space - self.barcode_width) / 2
-        elif self.horizontal_alignment == HorizontalAlignment.right:
-            offset = self.total_space - self.barcode_width
-        if self.rotate:
-            y += offset
-        else:
+        if not self.rotate:
+            if self.horizontal_alignment == HorizontalAlignment.center:
+                offset = (self.total_space - self.barcode_width) / 2
+            elif self.horizontal_alignment == HorizontalAlignment.right:
+                offset = self.total_space - self.barcode_width
             x += offset
+        else:
+            if self.vertical_alignment == VerticalAlignment.middle:
+                offset = (self.total_space - self.barcode_width) / 2
+            elif self.vertical_alignment == VerticalAlignment.bottom:
+                offset = self.total_space - self.barcode_width
+            y += offset
 
         if self.format == 'qrcode':
             pdf_doc.image(self.svg_data, x, y, self.barcode_width, self.barcode_height)

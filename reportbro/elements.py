@@ -157,6 +157,7 @@ class BarCodeElement(DocElement):
         elif error_correction_level == 'Q':
             self.error_correction_level = qrcode.ERROR_CORRECT_Q
         self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment', 'left')]
+        self.vertical_alignment = VerticalAlignment[data.get('verticalAlignment', 'top')]
         self.print_if = data.get('printIf', '')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
