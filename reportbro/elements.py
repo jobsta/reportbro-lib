@@ -278,7 +278,7 @@ class BarCodeElement(DocElement):
             self.rendering_complete = True
             return BarCodeRenderElement(
                 self.report, offset_y, content_width=content_width, render_height=render_height, barcode=self), True
-        if offset_y == 0:
+        if offset_y == 0 and container_top == 0:
             raise ReportBroError(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
         return None, False
 
