@@ -156,6 +156,8 @@ class BarCodeElement(DocElement):
             self.error_correction_level = qrcode.ERROR_CORRECT_H
         elif error_correction_level == 'Q':
             self.error_correction_level = qrcode.ERROR_CORRECT_Q
+        self.horizontal_alignment = HorizontalAlignment[data.get('horizontalAlignment', 'left')]
+        self.vertical_alignment = VerticalAlignment[data.get('verticalAlignment', 'top')]
         self.print_if = data.get('printIf', '')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.spreadsheet_hide = bool(data.get('spreadsheet_hide'))
@@ -257,9 +259,9 @@ class BarCodeElement(DocElement):
             content_width = pdf_doc.get_string_width(self.prepared_content)
 
         if self.rotate:
-            # if barcode is rotated and value is shown then the rendered height is the larger value of
-            # barcode width and value text width
-            height = self.barcode_width if self.barcode_width > content_width else content_width
+            # if barcode is rotated then rendered height is maximum of barcode width, displayed value text width
+            # and barcode element height
+            render_height = max(self.barcode_width, content_width, self.height)
         else:
             # make sure barcode fits inside available space of container when barcode width depends on barcode value
             if self.format in ('code39', 'code128'):
@@ -268,13 +270,16 @@ class BarCodeElement(DocElement):
                     raise ReportBroError(
                         Error('errorMsgInvalidSize', object_id=self.id, field='height'))
 
-            height = self.height
+            render_height = self.height
 
-        if offset_y + height <= container_height:
+        if offset_y + render_height <= container_height:
             self.render_y = offset_y
-            self.render_bottom = offset_y + height
+            self.render_bottom = offset_y + render_height
             self.rendering_complete = True
-            return BarCodeRenderElement(self.report, offset_y, content_width=content_width, barcode=self), True
+            return BarCodeRenderElement(
+                self.report, offset_y, content_width=content_width, render_height=render_height, barcode=self), True
+        if offset_y == 0 and container_top == 0:
+            raise ReportBroError(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
         return None, False
 
     def render_spreadsheet(self, row, col, ctx, renderer):

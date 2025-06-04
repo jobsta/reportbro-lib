@@ -195,7 +195,7 @@ class BarcodeSVGWriter(SVGWriter):
 
 
 class BarCodeRenderElement(DocElementBase):
-    def __init__(self, report, render_y, content_width, barcode):
+    def __init__(self, report, render_y, content_width, render_height, barcode):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
         self.x = barcode.x
@@ -204,15 +204,15 @@ class BarCodeRenderElement(DocElementBase):
         self.content = barcode.prepared_content
         self.display_value = barcode.display_value
         self.guardbar = barcode.guardbar
+        self.barcode_width = barcode.barcode_width
+        self.barcode_height = barcode.barcode_height
         self.rotate = barcode.rotate
+        self.horizontal_alignment = barcode.horizontal_alignment
+        self.vertical_alignment = barcode.vertical_alignment
         if barcode.rotate:
-            self.width = barcode.barcode_height
-            self.height = barcode.barcode_width
-            render_height = barcode.barcode_width if barcode.barcode_width > content_width else content_width
+            self.total_space = render_height
         else:
-            self.width = barcode.barcode_width
-            self.height = barcode.barcode_height
-            render_height = barcode.height
+            self.total_space = max(barcode.barcode_width, barcode.width)
         self.svg_data = barcode.svg_data
         self.object_id = barcode.id
         self.content_width = content_width  # width of content text when barcode value is displayed
@@ -221,20 +221,34 @@ class BarCodeRenderElement(DocElementBase):
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
         y = self.render_y + container_offset_y
+        if not self.rotate:
+            offset_x = 0
+            if self.horizontal_alignment == HorizontalAlignment.center:
+                offset_x = (self.total_space - self.barcode_width) / 2
+            elif self.horizontal_alignment == HorizontalAlignment.right:
+                offset_x = self.total_space - self.barcode_width
+            x += offset_x
+        else:
+            offset_y = 0
+            if self.vertical_alignment == VerticalAlignment.middle:
+                offset_y = (self.total_space - self.barcode_width) / 2
+            elif self.vertical_alignment == VerticalAlignment.bottom:
+                offset_y = self.total_space - self.barcode_width
+            y += offset_y
 
         if self.format == 'qrcode':
-            pdf_doc.image(self.svg_data, x, y, self.width, self.height)
+            pdf_doc.image(self.svg_data, x, y, self.barcode_width, self.barcode_height)
         else:
             rotate_angle = 0
             if self.rotate:
                 rotate_angle = 270  # rotate 270 degrees counter clockwise
-                offset_x = self.width
+                offset_y = self.barcode_height
                 if self.display_value:
                     # move by 20 pixel to leave space for barcode value as text
-                    offset_x += 20
+                    offset_y += 20
                 with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
-                    # because we rotate by 270 degrees ccw we have to adapt the x offset on the y coordinate
-                    pdf_doc.image(self.svg_data, x, y - offset_x)
+                    # because we rotate by 270 degrees ccw we have to adapt the offset on the y coordinate
+                    pdf_doc.image(self.svg_data, x, y - offset_y)
             else:
                 pdf_doc.image(self.svg_data, x, y)
 
@@ -245,19 +259,17 @@ class BarCodeRenderElement(DocElementBase):
                 pdf_doc.set_text_color(0, 0, 0)
                 # show barcode value centered and below barcode,
                 # in case text is larger than barcode we show the text at same position as barcode
+                offset_x = (self.barcode_width - self.content_width) / 2
+                if offset_x < 0:
+                    offset_x = 0
                 if rotate_angle:
-                    offset_y = (self.height - self.content_width) / 2
-                    if offset_y < 0:
-                        offset_y = 0
                     with pdf_doc.rotation(angle=rotate_angle, x=x, y=y):
                         # because we rotate by 270 degrees ccw we have to adapt the y offset on the x coordinate
-                        pdf_doc.print_text(x + offset_y, y, self.content, object_id=self.object_id, field='content')
+                        pdf_doc.print_text(x + offset_x, y, self.content, object_id=self.object_id, field='content')
                 else:
-                    offset_x = (self.width - self.content_width) / 2
-                    if offset_x < 0:
-                        offset_x = 0
                     pdf_doc.print_text(
-                        x + offset_x, y + self.height + 20, self.content, object_id=self.object_id, field='content')
+                        x + offset_x, y + self.barcode_height + 20, self.content,
+                        object_id=self.object_id, field='content')
 
     def cleanup(self):
         if self.svg_data:
