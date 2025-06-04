@@ -1642,7 +1642,8 @@ class FrameElement(DocElement):
             self.container.clear_rendered_elements()
             self.rendering_complete = self.container.create_render_elements(
                 container_top, content_height, ctx, pdf_doc)
-        self.render_bottom = offset_y + self.get_render_bottom()
+        needed_height = self.get_render_bottom()
+        self.render_bottom = offset_y + needed_height
 
         if not self.rendering_complete:
             # use whole size of container if frame is not rendered completely
@@ -1657,7 +1658,7 @@ class FrameElement(DocElement):
                 self.render_element_type = RenderElementType.complete
             else:
                 self.render_element_type = RenderElementType.last
-        render_element.add_elements(self.container, self.render_element_type, self.get_render_bottom())
+        render_element.add_elements(self.container, self.render_element_type, needed_height)
         return render_element, self.rendering_complete
 
     def render_spreadsheet(self, row, col, ctx, renderer):
