@@ -195,7 +195,7 @@ class BarcodeSVGWriter(SVGWriter):
 
 
 class BarCodeRenderElement(DocElementBase):
-    def __init__(self, report, render_y, content_width, barcode):
+    def __init__(self, report, render_y, content_width, render_height, barcode):
         DocElementBase.__init__(self, report, dict(y=0))
         self.report = report
         self.x = barcode.x
@@ -210,13 +210,9 @@ class BarCodeRenderElement(DocElementBase):
         self.horizontal_alignment = barcode.horizontal_alignment
         self.vertical_alignment = barcode.vertical_alignment
         if barcode.rotate:
-            self.total_space = barcode.height
-            render_height = barcode.barcode_width if barcode.barcode_width > content_width else content_width
-            if barcode.height > render_height:
-                render_height = barcode.height
+            self.total_space = render_height
         else:
-            self.total_space = barcode.width
-            render_height = barcode.height
+            self.total_space = max(barcode.barcode_width, barcode.width)
         self.svg_data = barcode.svg_data
         self.object_id = barcode.id
         self.content_width = content_width  # width of content text when barcode value is displayed
@@ -225,19 +221,20 @@ class BarCodeRenderElement(DocElementBase):
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         x = self.x + container_offset_x
         y = self.render_y + container_offset_y
-        offset = 0
         if not self.rotate:
+            offset_x = 0
             if self.horizontal_alignment == HorizontalAlignment.center:
-                offset = (self.total_space - self.barcode_width) / 2
+                offset_x = (self.total_space - self.barcode_width) / 2
             elif self.horizontal_alignment == HorizontalAlignment.right:
-                offset = self.total_space - self.barcode_width
-            x += offset
+                offset_x = self.total_space - self.barcode_width
+            x += offset_x
         else:
+            offset_y = 0
             if self.vertical_alignment == VerticalAlignment.middle:
-                offset = (self.total_space - self.barcode_width) / 2
+                offset_y = (self.total_space - self.barcode_width) / 2
             elif self.vertical_alignment == VerticalAlignment.bottom:
-                offset = self.total_space - self.barcode_width
-            y += offset
+                offset_y = self.total_space - self.barcode_width
+            y += offset_y
 
         if self.format == 'qrcode':
             pdf_doc.image(self.svg_data, x, y, self.barcode_width, self.barcode_height)

@@ -259,11 +259,9 @@ class BarCodeElement(DocElement):
             content_width = pdf_doc.get_string_width(self.prepared_content)
 
         if self.rotate:
-            # if barcode is rotated and value is shown then the rendered height is the larger value of
-            # barcode width and value text width
-            height = self.barcode_width if self.barcode_width > content_width else content_width
-            if self.height > height:
-                height = self.height
+            # if barcode is rotated then rendered height is maximum of barcode width, displayed value text width
+            # and barcode element height
+            render_height = max(self.barcode_width, content_width, self.height)
         else:
             # make sure barcode fits inside available space of container when barcode width depends on barcode value
             if self.format in ('code39', 'code128'):
@@ -272,13 +270,14 @@ class BarCodeElement(DocElement):
                     raise ReportBroError(
                         Error('errorMsgInvalidSize', object_id=self.id, field='height'))
 
-            height = self.height
+            render_height = self.height
 
-        if offset_y + height <= container_height:
+        if offset_y + render_height <= container_height:
             self.render_y = offset_y
-            self.render_bottom = offset_y + height
+            self.render_bottom = offset_y + render_height
             self.rendering_complete = True
-            return BarCodeRenderElement(self.report, offset_y, content_width=content_width, barcode=self), True
+            return BarCodeRenderElement(
+                self.report, offset_y, content_width=content_width, render_height=render_height, barcode=self), True
         if offset_y == 0:
             raise ReportBroError(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
         return None, False
