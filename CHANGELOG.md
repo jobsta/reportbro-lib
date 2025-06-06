@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.11.0] - 2025-06-06
+
+### Features
+* Support alignment for barcode
+
+### Changes
+* Set minimum page height to 10mm
+* Drop support for Python 3.8 (EOL October 2024)
+* Update simpleeval dependency to fix warnings in tests
+
+### Bug Fixes
+* Fix rendering frame which does not fit on current page
+
 ## [3.10.0] - 2025-01-03
 
 ### Changes
