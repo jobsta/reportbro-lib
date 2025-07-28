@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.11.2] - 2025-07-28
+
+### Bug Fixes
+* Fix rendering shaped text with additional style
+
 ## [3.11.1] - 2025-07-28
 
 ### Changes
