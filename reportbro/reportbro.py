@@ -25,7 +25,9 @@ from copy import deepcopy
 from babel import Locale
 from babel.core import UnknownLocaleError
 from datetime import datetime
+from fpdf.enums import TextEmphasis
 from io import BufferedReader, IOBase
+from typing import Union
 from urllib import request
 
 from .containers import ReportBand
@@ -486,7 +488,8 @@ class FPDFRB(fpdf.FPDF):
         # fonts are stored with lowercase font name
         return self.available_fonts.get(font_name)
 
-    def set_font(self, family=None, style='', size=0, underline=False, strikethrough=False):
+    def set_font(self, family=None, style: Union[str, TextEmphasis] = '', size: float = 0,
+                 underline: bool = False, strikethrough: bool = False):
         """Set font in underlying pdf renderer.
 
         This font is used for all following text rendering calls until changed again.
@@ -505,6 +508,9 @@ class FPDFRB(fpdf.FPDF):
         # fonts are stored with lowercase font name
         font = self.available_fonts.get(font_name)
         if font:
+            if isinstance(style, TextEmphasis):
+                style = style.style
+
             if not font['standard_font']:
                 # get font for specific style
                 if style:
