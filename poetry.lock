@@ -395,12 +395,12 @@ test = ["coverage", "pytest"]
 
 [[package]]
 name = "reportbro-fpdf2"
-version = "2.7.9"
+version = "2.8.1"
 description = "Simple & fast PDF generation for Python"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "reportbro_fpdf2-2.7.9-py2.py3-none-any.whl", hash = "sha256:ecc3fa85a7a466b4cb9b140477a8267c938f6b4f4f0125fedde512b6ef2d644d"},
+    {file = "reportbro_fpdf2-2.8.1-py2.py3-none-any.whl", hash = "sha256:810961dfce0f3abd0ee3a2f35f6feca87b98cb89dcc1402bf6750af87d839b3f"},
 ]
 
 [package.dependencies]
@@ -455,4 +455,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "11241081461743fe51a96a464a95e52dbe4a5c35f037a71d50978f7d27f4415b"
+content-hash = "52c337b68f0bbfec01886c25d3da9c87ccb9ffce547e8fd72e9d14b6177116a6"

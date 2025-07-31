@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.11.2] - 2025-07-28
+
+### Bug Fixes
+* Fix rendering shaped text with additional style
+
+## [3.11.1] - 2025-07-28
+
+### Changes
+* Update reportbro-fpdf2 dependency to fix alignment of shaped text
+
+### Bug Fixes
+* Fix parsing rich text parameter with "a" tag (PLUS version)
+
 ## [3.11.0] - 2025-06-06
 
 ### Features
