@@ -65,6 +65,12 @@ class Container(object):
         else:
             self.sorted_elements = sorted(self.sorted_elements, key=lambda item: (item.y, item.x))
 
+    def clear_doc_elements(self):
+        """
+        Clear list of added document elements. Can be used to clear a virtual container.
+        """
+        self.doc_elements = []
+
     def clear_rendered_elements(self):
         self.render_elements = []
         self.render_bottom = 0

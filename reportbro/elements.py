@@ -1351,6 +1351,8 @@ class TableBandElement(object):
                 cell.expand_simple_array(printed_cells, ctx)
         self.printed_cells = printed_cells
         table_width = 0
+
+        self.container.clear_doc_elements()
         for cell in printed_cells:
             cell.x = table_width
             table_width += cell.width
