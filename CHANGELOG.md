@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.11.3] - 2025-08-26
+
+### Bug Fixes
+* Fix printing repeated header with parameters
+* Fix rendering spreadsheet with nested table
+
 ## [3.11.2] - 2025-07-28
 
 ### Bug Fixes
