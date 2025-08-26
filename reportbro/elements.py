@@ -1090,8 +1090,9 @@ class TableElement(DocElement):
         render_element = TableRenderElement(self.report, table=self, render_y=offset_y)
 
         if self.print_header:
-            if not self.header.rendering_complete:
-                self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
+            # create render elements every time header is printed (instead of reusing rendered elements)
+            # as header can contain parameters
+            self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
             render_element.add_band(self.header)
             if not self.header.rendering_complete:
                 return render_element, False
