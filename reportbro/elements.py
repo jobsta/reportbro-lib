@@ -434,7 +434,7 @@ class TextElement(DocElement):
                                 Error('errorMsgInvalidPattern', object_id=self.id, field='pattern', context=self.content))
                 content = to_string(content)
             else:
-                if pdf_doc is None and self.spreadsheet_type != SpreadsheetType.default:
+                if pdf_doc is None and self.spreadsheet_type in (SpreadsheetType.number, SpreadsheetType.date):
                     # content is exported to spreadsheet with specific type -> use string representation of
                     # parameter value so the content can be parsed for the type when spreadsheet is rendered
                     content = ctx.fill_parameters(self.content, self.id, field='content', ignore_pattern=True)
@@ -645,7 +645,7 @@ class TextElement(DocElement):
                 if self.used_style.border_bottom:
                     format_props['bottom'] = 1
 
-            if self.spreadsheet_type != SpreadsheetType.default and self.spreadsheet_pattern:
+            if self.spreadsheet_type in (SpreadsheetType.number, SpreadsheetType.date) and self.spreadsheet_pattern:
                 num_format = self.spreadsheet_pattern
                 if '$' in num_format:
                     num_format = num_format.replace('$', '[$' + ctx.pattern_currency_symbol + ']')
@@ -654,6 +654,9 @@ class TextElement(DocElement):
                 # use iso format as default when no pattern is specified for date parameter, otherwise
                 # date is shown as a number
                 format_props['num_format'] = 'yyyy-mm-dd'
+            elif self.spreadsheet_type == SpreadsheetType.text:
+                # use text format to avoid auto-detection of cell type
+                format_props['num_format'] = '@'
 
             if self.spreadsheet_text_wrap:
                 format_props['text_wrap'] = True
@@ -667,7 +670,7 @@ class TextElement(DocElement):
         if self.spreadsheet_column:
             col = self.spreadsheet_column - 1
         renderer.write(row, col, self.spreadsheet_colspan, content, cell_format,
-                       self.width, url=self.prepared_link)
+                       self.width, url=self.prepared_link, spreadsheet_type=self.spreadsheet_type)
         if self.spreadsheet_add_empty_row:
             row += 1
         return row + 1, col + (self.spreadsheet_colspan if self.spreadsheet_colspan else 1)

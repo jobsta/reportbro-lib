@@ -50,6 +50,7 @@ class SpreadsheetType(Enum):
     default = 0
     number = 1
     date = 2
+    text = 3
 
 
 class BandType(Enum):

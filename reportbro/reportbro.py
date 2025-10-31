@@ -192,11 +192,18 @@ class DocumentXLSXRenderer:
         if width > self.column_widths[col]:
             self.column_widths[col] = width
 
-    def write(self, row, col, colspan, data, cell_format, width, url=None):
+    def write(self, row, col, colspan, data, cell_format, width, url=None, spreadsheet_type=None):
         if colspan > 1:
             self.worksheet.merge_range(row, col, row, col + colspan - 1, data, cell_format)
         elif not url:
-            self.worksheet.write(row, col, data, cell_format)
+            if spreadsheet_type == SpreadsheetType.number:
+                self.worksheet.write_number(row, col, data, cell_format)
+            elif spreadsheet_type == SpreadsheetType.date:
+                self.worksheet.write_datetime(row, col, data, cell_format)
+            elif spreadsheet_type == SpreadsheetType.text:
+                self.worksheet.write_string(row, col, data, cell_format)
+            else:
+                self.worksheet.write(row, col, data, cell_format)
             self.update_column_width(col, width)
         # url also works combined with colspan, the first cell of the range is simply overwritten
         if url:
