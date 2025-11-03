@@ -136,6 +136,7 @@ class BarCodeElement(DocElement):
         if self.format not in ('code39', 'code128', 'ean8', 'ean13', 'upc', 'qrcode'):
             raise ReportBroInternalError(f'invalid format for barcode element {self.id}', log_error=False)
         self.display_value = bool(data.get('displayValue'))
+        self.add_checksum = bool(data.get('addChecksum'))
         self.guardbar = bool(data.get('guardBar'))
         if self.format not in ('ean8', 'ean13'):
             self.guardbar = False
@@ -213,7 +214,7 @@ class BarCodeElement(DocElement):
 
                 try:
                     if self.format == 'code39':
-                        barcode = Code39(self.prepared_content, writer=svg_writer)
+                        barcode = Code39(self.prepared_content, writer=svg_writer, add_checksum=self.add_checksum)
                         self.prepared_content = barcode.code  # make sure value is upper case and contains checksum
                     elif self.format == 'code128':
                         barcode = Code128(self.prepared_content, writer=svg_writer)
