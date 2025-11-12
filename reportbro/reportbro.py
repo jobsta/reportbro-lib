@@ -651,18 +651,23 @@ class Report:
             parameter_list.append(parameter)
 
         for item in report_definition.get('styles'):
-            if not item.get('type'):
-                style = TextStyle(item)  # report version < 5
+            item_type = item.get('type', 'text')
+            if item_type == 'text':
+                style = TextStyle(self, item)
+            elif item_type == 'line':
+                style = LineStyle(self, item)
+            elif item_type == 'image':
+                style = ImageStyle(self, item)
+            elif item_type == 'table':
+                style = TableStyle(self, item)
+            elif item_type == 'tableBand':
+                style = TableBandStyle(self, item)
+            elif item_type == 'frame':
+                style = FrameStyle(self, item)
+            elif item_type == 'sectionBand':
+                style = SectionBandStyle(self, item)
             else:
-                style = {
-                    'text': TextStyle(item),
-                    'line': LineStyle(item),
-                    'image': ImageStyle(item),
-                    'table': TableStyle(item),
-                    'tableBand': TableBandStyle(item),
-                    'frame': FrameStyle(item),
-                    'sectionBand': SectionBandStyle(item),
-                }.get(item.get('type'))
+                assert False
             style_id = int(item.get('id'))
             self.styles[style_id] = style
 

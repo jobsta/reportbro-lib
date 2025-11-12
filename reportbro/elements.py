@@ -36,7 +36,7 @@ class ImageElement(DocElement):
                 raise ReportBroInternalError(f'Style for image element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = ImageStyle(data, id_suffix='_image')
+            self.style = ImageStyle(report, data, id_suffix='_image')
 
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
@@ -304,7 +304,7 @@ class LineElement(DocElement):
                 raise ReportBroInternalError(f'Style for line element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = LineStyle(data, id_suffix='_line')
+            self.style = LineStyle(report, data, id_suffix='_line')
 
     def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
         self.render_y = offset_y
@@ -345,7 +345,7 @@ class TextElement(DocElement):
                 raise ReportBroInternalError(f'Style for text element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = TextStyle(data, id_suffix='_text')
+            self.style = TextStyle(report, data, id_suffix='_text')
 
         self.print_if = get_str_value(data, 'printIf')
         self.pattern = get_str_value(data, 'pattern')
@@ -359,7 +359,7 @@ class TextElement(DocElement):
                     raise ReportBroInternalError(f'Conditional style for text element {self.id} not found')
                 self.conditional_style = style
             else:
-                self.conditional_style = TextStyle(data, key_prefix='cs_', id_suffix='_text_cs')
+                self.conditional_style = TextStyle(report, data, key_prefix='cs_', id_suffix='_text_cs')
 
             if data.get('cs_additionalRules'):
                 try:
@@ -740,12 +740,39 @@ class TextBlockElement(DocElementBase):
 
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         y = container_offset_y + self.render_y
+        round_corners = bool(self.style.border_radius)
+        rect_style = ''
         if not self.style.background_color.transparent:
+            rect_style = 'F'
             pdf_doc.set_fill_color(
                 self.style.background_color.r, self.style.background_color.g, self.style.background_color.b)
-            pdf_doc.rect(self.x + container_offset_x, y, self.width, self.height, style='F')
+            rect_x = self.x + container_offset_x
+            rect_y = y
+            rect_width = self.width
+            rect_height = self.height
+            if self.style.border_all:
+                pdf_doc.set_draw_color(
+                    self.style.border_color.r, self.style.border_color.g, self.style.border_color.b)
+                pdf_doc.set_line_width(self.style.border_width)
+                rect_style = 'DF'
+                # update position and size of rect as border is drawn outside of filled rect
+                rect_x += self.style.border_width / 2
+                rect_y += self.style.border_width / 2
+                rect_width -= self.style.border_width
+                rect_height -= self.style.border_width
+            pdf_doc.rect(
+                rect_x, rect_y, rect_width, rect_height, style=rect_style,
+                round_corners=round_corners, corner_radius=self.style.border_radius)
+        elif round_corners:
+            pdf_doc.set_line_width(self.style.border_width)
+            rect_style = 'D'
+            pdf_doc.rect(
+                self.x + container_offset_x, y, self.width, self.height, style=rect_style,
+                round_corners=round_corners, corner_radius=self.style.border_radius)
+
         if (self.style.border_left or self.style.border_top or
-                self.style.border_right or self.style.border_bottom):
+                self.style.border_right or self.style.border_bottom) and 'D' not in rect_style:
+            # draw border(s) in case border is not already drawn with background rect
             DocElement.draw_border(
                 x=self.x+container_offset_x, y=y, width=self.width, height=self.height,
                 render_element_type=self.render_element_type, border_style=self.style, pdf_doc=pdf_doc)
@@ -962,7 +989,7 @@ class TableElement(DocElement):
                 raise ReportBroInternalError(f'Style for table element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = TableStyle(data, id_suffix='_table')
+            self.style = TableStyle(report, data, id_suffix='_table')
 
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
@@ -1276,7 +1303,7 @@ class TableBandElement(object):
                 raise ReportBroInternalError(f'Style for table band element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = TableBandStyle(data, id_suffix='_table_band')
+            self.style = TableBandStyle(report, data, id_suffix='_table_band')
 
         self.background_color = Color(data.get('backgroundColor'))
         self.print_if = get_str_value(data, 'printIf')
@@ -1544,7 +1571,7 @@ class FrameElement(DocElement):
                 raise ReportBroInternalError(f'Style for frame element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = FrameStyle(data, id_suffix='_frame')
+            self.style = FrameStyle(report, data, id_suffix='_frame')
         self.print_if = get_str_value(data, 'printIf')
         self.remove_empty_element = bool(data.get('removeEmptyElement'))
         self.shrink_to_content_height = bool(data.get('shrinkToContentHeight'))
@@ -1692,7 +1719,7 @@ class SectionBandElement(object):
                 raise ReportBroInternalError(f'Style for section element {self.id} not found', log_error=False)
             self.style = style
         else:
-            self.style = SectionBandStyle(data, id_suffix='_section_band')
+            self.style = SectionBandStyle(report, data, id_suffix='_section_band')
 
         if band_type == BandType.header:
             self.repeat_header = bool(data.get('repeatHeader'))

@@ -446,9 +446,25 @@ class FrameRenderElement(DocElementBase):
                 self.render_element_type in (RenderElementType.last, RenderElementType.complete):
             content_height -= self.border_style.border_width
 
+        round_corners = bool(self.border_style.border_radius)
         if not self.background_color.transparent:
+            rect_style = 'F'
             pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
-            pdf_doc.rect(content_x, content_y, content_width, content_height, style='F')
+            if self.border_style.border_all:
+                pdf_doc.set_draw_color(
+                    self.border_style.border_color.r,
+                    self.border_style.border_color.g,
+                    self.border_style.border_color.b)
+                pdf_doc.set_line_width(self.border_style.border_width)
+                rect_style = 'DF'
+            pdf_doc.rect(
+                content_x, content_y, content_width, content_height, style=rect_style,
+                round_corners=round_corners, corner_radius=self.border_style.border_radius)
+        elif round_corners:
+            pdf_doc.set_line_width(self.border_style.border_width)
+            pdf_doc.rect(
+                content_x, content_y, content_width, content_height, style='D',
+                round_corners=round_corners, corner_radius=self.border_style.border_radius)
 
         render_y = y
         if self.border_style.border_top and\
@@ -458,7 +474,7 @@ class FrameRenderElement(DocElementBase):
             element.render_pdf(container_offset_x=content_x, container_offset_y=content_y, pdf_doc=pdf_doc)
 
         if (self.border_style.border_left or self.border_style.border_top or
-                self.border_style.border_right or self.border_style.border_bottom):
+                self.border_style.border_right or self.border_style.border_bottom) and not round_corners:
             DocElement.draw_border(
                 x=x, y=y, width=self.width, height=height,
                 render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)
