@@ -31,10 +31,10 @@ packages = [
 include = ["data/logo_watermark.png"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 Babel = "^2.14.0"
 python-barcode = "^0.15.1"
-reportbro-fpdf2 = "^2.8.1"
+reportbro-fpdf2 = "^2.8.2"
 # reportbro-fpdf2 = { path = "../fpdf2/", develop = true}
 simpleeval = "^1.0.3"
 Pillow = "^10.2.0"
