@@ -428,29 +428,32 @@ class FrameRenderElement(DocElementBase):
         y = self.render_y + container_offset_y
         height = self.render_bottom - self.render_y
 
-        content_x = x
-        content_width = self.width
-        content_y = y
-        content_height = height
-
-        if self.border_style.border_left:
-            content_x += self.border_style.border_width
-            content_width -= self.border_style.border_width
-        if self.border_style.border_right:
-            content_width -= self.border_style.border_width
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            content_y += self.border_style.border_width
-            content_height -= self.border_style.border_width
-        if self.border_style.border_bottom and\
-                self.render_element_type in (RenderElementType.last, RenderElementType.complete):
-            content_height -= self.border_style.border_width
-
         round_corners = bool(self.border_style.border_radius)
+        rect_x = x
+        rect_y = y
+        rect_width = self.width
+        rect_height = height
+        render_x = x
+        render_y = y
+        if (not self.background_color.transparent and self.border_style.border_all and
+            self.render_element_type == RenderElementType.complete) or (
+                self.background_color.transparent and round_corners):
+            # update position and size of rect so border is drawn inside rect
+            rect_x += self.border_style.border_width / 2
+            rect_y += self.border_style.border_width / 2
+            rect_width -= self.border_style.border_width
+            rect_height -= self.border_style.border_width
+        if self.border_style.border_left:
+            render_x += self.border_style.border_width
+        if self.border_style.border_top:
+            render_y += self.border_style.border_width
+        rect_style = ''
+
         if not self.background_color.transparent:
             rect_style = 'F'
             pdf_doc.set_fill_color(self.background_color.r, self.background_color.g, self.background_color.b)
-            if self.border_style.border_all:
+            if self.border_style.border_all and self.render_element_type == RenderElementType.complete:
+                # draw rect with full border
                 pdf_doc.set_draw_color(
                     self.border_style.border_color.r,
                     self.border_style.border_color.g,
@@ -458,23 +461,22 @@ class FrameRenderElement(DocElementBase):
                 pdf_doc.set_line_width(self.border_style.border_width)
                 rect_style = 'DF'
             pdf_doc.rect(
-                content_x, content_y, content_width, content_height, style=rect_style,
+                x=rect_x, y=rect_y, w=rect_width, h=rect_height, style=rect_style,
                 round_corners=round_corners, corner_radius=self.border_style.border_radius)
         elif round_corners:
+            pdf_doc.set_draw_color(
+                self.border_style.border_color.r, self.border_style.border_color.g, self.border_style.border_color.b)
             pdf_doc.set_line_width(self.border_style.border_width)
+            rect_style = 'D'
             pdf_doc.rect(
-                content_x, content_y, content_width, content_height, style='D',
+                x=rect_x, y=rect_y, w=rect_width, h=rect_height, style='D',
                 round_corners=round_corners, corner_radius=self.border_style.border_radius)
 
-        render_y = y
-        if self.border_style.border_top and\
-                self.render_element_type in (RenderElementType.first, RenderElementType.complete):
-            render_y += self.border_style.border_width
         for element in self.elements:
-            element.render_pdf(container_offset_x=content_x, container_offset_y=content_y, pdf_doc=pdf_doc)
+            element.render_pdf(container_offset_x=render_x, container_offset_y=render_y, pdf_doc=pdf_doc)
 
         if (self.border_style.border_left or self.border_style.border_top or
-                self.border_style.border_right or self.border_style.border_bottom) and not round_corners:
+                self.border_style.border_right or self.border_style.border_bottom) and 'D' not in rect_style:
             DocElement.draw_border(
                 x=x, y=y, width=self.width, height=height,
                 render_element_type=self.render_element_type, border_style=self.border_style, pdf_doc=pdf_doc)

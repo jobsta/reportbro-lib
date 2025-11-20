@@ -291,10 +291,15 @@ class TextStyle(BorderStyle):
         self.add_border_padding()
 
         if self.border_radius:
+            print_on_same_page_key = key_prefix + 'alwaysPrintOnSamePage'
             has_border = self.border_left or self.border_top or self.border_right or self.border_bottom
             if (not self.border_all and has_border) or (not has_border and self.background_color.transparent):
                 report.errors.append(
                     Error('errorMsgBorderRadiusNotAllowed', object_id=object_id, field=key_prefix + 'borderRadius'))
+            elif print_on_same_page_key in data and not bool(data.get(print_on_same_page_key)):
+                report.errors.append(
+                    Error('errorMsgBorderRadiusOnlyOnSamePage',
+                          object_id=object_id, field=key_prefix + 'alwaysPrintOnSamePage'))
 
     def set_bold(self, bold):
         """
@@ -323,13 +328,13 @@ class TextStyle(BorderStyle):
         return font_style
 
     def add_border_padding(self):
-        if self.border_left:
+        if self.border_left or self.border_radius:
             self.padding_left += self.border_width
-        if self.border_top:
+        if self.border_top or self.border_radius:
             self.padding_top += self.border_width
-        if self.border_right:
+        if self.border_right or self.border_radius:
             self.padding_right += self.border_width
-        if self.border_bottom:
+        if self.border_bottom or self.border_radius:
             self.padding_bottom += self.border_width
 
 

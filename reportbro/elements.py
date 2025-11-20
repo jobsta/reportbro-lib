@@ -741,33 +741,39 @@ class TextBlockElement(DocElementBase):
     def render_pdf(self, container_offset_x, container_offset_y, pdf_doc):
         y = container_offset_y + self.render_y
         round_corners = bool(self.style.border_radius)
+        rect_x = self.x + container_offset_x
+        rect_y = y
+        rect_width = self.width
+        rect_height = self.height
+        if (not self.style.background_color.transparent and self.style.border_all and
+            self.render_element_type == RenderElementType.complete) or (
+                self.style.background_color.transparent and round_corners):
+            # update position and size of rect so border is drawn inside rect
+            rect_x += self.style.border_width / 2
+            rect_y += self.style.border_width / 2
+            rect_width -= self.style.border_width
+            rect_height -= self.style.border_width
         rect_style = ''
         if not self.style.background_color.transparent:
             rect_style = 'F'
             pdf_doc.set_fill_color(
                 self.style.background_color.r, self.style.background_color.g, self.style.background_color.b)
-            rect_x = self.x + container_offset_x
-            rect_y = y
-            rect_width = self.width
-            rect_height = self.height
-            if self.style.border_all:
+            if self.style.border_all and self.render_element_type == RenderElementType.complete:
+                # draw rect with full border
                 pdf_doc.set_draw_color(
                     self.style.border_color.r, self.style.border_color.g, self.style.border_color.b)
                 pdf_doc.set_line_width(self.style.border_width)
                 rect_style = 'DF'
-                # update position and size of rect as border is drawn outside of filled rect
-                rect_x += self.style.border_width / 2
-                rect_y += self.style.border_width / 2
-                rect_width -= self.style.border_width
-                rect_height -= self.style.border_width
             pdf_doc.rect(
-                rect_x, rect_y, rect_width, rect_height, style=rect_style,
+                x=rect_x, y=rect_y, w=rect_width, h=rect_height, style=rect_style,
                 round_corners=round_corners, corner_radius=self.style.border_radius)
         elif round_corners:
+            pdf_doc.set_draw_color(
+                self.style.border_color.r, self.style.border_color.g, self.style.border_color.b)
             pdf_doc.set_line_width(self.style.border_width)
             rect_style = 'D'
             pdf_doc.rect(
-                self.x + container_offset_x, y, self.width, self.height, style=rect_style,
+                x=rect_x, y=rect_y, w=rect_width, h=rect_height, style=rect_style,
                 round_corners=round_corners, corner_radius=self.style.border_radius)
 
         if (self.style.border_left or self.style.border_top or
