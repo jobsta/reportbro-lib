@@ -13,7 +13,7 @@ GUIDES = [
     '12_dynamic-columns', '13_multi-page-layout',
 ]
 MISC_TESTS = [
-    'barcode', 'border_radius', 'line', 'hello_world', 'spreadsheet_type', 'style',
+    'barcode', 'border', 'line', 'hello_world', 'spreadsheet_type', 'style',
     'table_group', 'text_justified', 'thousands_separator',
 ]
 
