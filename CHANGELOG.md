@@ -1,10 +1,15 @@
 # Changelog
 
-## Upcoming Release
+## [3.12.0] - 2025-12-01
+
+### Features
+* Support border radius
 
 ### Changes
-* Support "text" option for spreadsheet type
 * Support setting to add checksum for CODE39 barcode
+* Support "text" option for spreadsheet type
+* Update reportbro-fpdf2 dependency to support border radius
+* Drop support for Python 3.9 (EOL October 2025)
 
 ## [3.11.3] - 2025-08-26
 
