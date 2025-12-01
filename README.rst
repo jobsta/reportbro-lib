@@ -10,7 +10,7 @@ See the ReportBro project website on https://www.reportbro.com for full document
 Features
 --------
 
-* Python >= 3.8 support
+* Python >= 3.10 support
 * Generate pdf and xlsx reports
 * Supports (repeating) header and footer
 * Allows predefined and own page formats
