@@ -44,9 +44,14 @@ With ReportBro Cloud you can manage all your reports in your account and use onl
 License
 -------
 
+ReportBro is dual licensed. You can coose depending on your use case.
+Read more about ReportBro's license options at https://www.reportbro.com/pricing/index#framework-license.
+
 - Commercial license
 
-If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license. With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/framework/license
+If you want to use ReportBro to develop commercial applications and projects, the Commercial license is the appropriate license.
+See https://www.reportbro.com/framework/license_agreement for the full license text.
+With this license, your source code is kept proprietary. Purchase a ReportBro Commercial license at https://www.reportbro.com/pricing/index#framework-license.
 
 This license includes ReportBro PLUS with additional features.
 
@@ -54,4 +59,7 @@ This license includes ReportBro PLUS with additional features.
 
 If you are creating an open-source application under a license compatible with the `GNU AGPL license v3 <https://www.gnu.org/licenses/agpl-3.0.html>`_, you may use ReportBro under the terms of the AGPLv3.
 
-Read more about ReportBro's license options at https://www.reportbro.com/framework/license.
+Contributing
+------------
+
+We are always happy about new contributions. See CONTRIBUTING.md for details.
