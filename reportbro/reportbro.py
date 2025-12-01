@@ -362,6 +362,9 @@ class ImageData:
         if img_data_b64 is None and not image_uri and self.image_data is None and image_file:
             # static image base64 encoded within image element
             img_data_b64 = image_file
+        
+        elif img_data_b64 is None and self.image_data is None and image_file == image_uri:
+            img_data_b64 = image_file
 
         if img_data_b64:
             m = re.match('^data:image/(.+);base64,', img_data_b64)
