@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.12.1] - 2026-04-10
+
+### Bug Fixes
+* Fix simpleeval compatibility and allow access to datetime module
+
 ## [3.12.0] - 2025-12-01
 
 ### Features
