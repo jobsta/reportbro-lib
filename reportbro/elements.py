@@ -465,9 +465,6 @@ class TextElement(DocElement):
                 self.used_style = self.style
         else:
             self.used_style = self.style
-        if self.used_style.vertical_alignment != VerticalAlignment.top and not self.always_print_on_same_page and\
-                not isinstance(self, TableTextElement):
-            self.always_print_on_same_page = True
         available_width = self.width - self.used_style.padding_left - self.used_style.padding_right
 
         self.text_lines = []
