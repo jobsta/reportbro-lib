@@ -93,7 +93,7 @@ class Container(object):
                 offset_y = 0
         return offset_y
 
-    def create_render_elements(self, container_top, container_height, ctx, pdf_doc):
+    def create_render_elements(self, container_top, container_height, is_top_of_page, ctx, pdf_doc):
         i = 0
         new_page = False
         processed_elements = []
@@ -127,9 +127,12 @@ class Container(object):
                         if offset_y >= container_height:
                             new_page = True
                         if not new_page:
+                            if is_top_of_page and offset_y > 0:
+                                is_top_of_page = False
                             render_elem, complete = elem.get_next_render_element(
                                 offset_y, container_top=container_top,
                                 container_width=self.width, container_height=container_height,
+                                is_top_of_page=is_top_of_page,
                                 ctx=ctx, pdf_doc=pdf_doc)
                             if complete:
                                 processed_elements.append(elem)

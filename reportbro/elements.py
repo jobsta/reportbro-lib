@@ -86,9 +86,10 @@ class ImageElement(DocElement):
                 raise ReportBroError(
                     Error('errorMsgInvalidLink', object_id=self.id, field='link'))
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         _, rv = DocElement.get_next_render_element(
-            self, offset_y, container_top, container_width, container_height, ctx, pdf_doc)
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc)
         if not rv:
             return None, False
         return ImageRenderElement(self.report, offset_y, self), True
@@ -253,7 +254,8 @@ class BarCodeElement(DocElement):
                     )
                     self.barcode_width = svg_writer.barcode_width
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         content_width = 0
         if self.display_value:
             pdf_doc.set_font('courier', 'B', 18)
@@ -279,7 +281,7 @@ class BarCodeElement(DocElement):
             self.rendering_complete = True
             return BarCodeRenderElement(
                 self.report, offset_y, content_width=content_width, render_height=render_height, barcode=self), True
-        if offset_y == 0 and container_top == 0:
+        if offset_y == 0 and is_top_of_page:
             raise ReportBroError(Error('errorMsgInvalidSize', object_id=self.id, field='size'))
         return None, False
 
@@ -306,7 +308,8 @@ class LineElement(DocElement):
         else:
             self.style = LineStyle(report, data, id_suffix='_line')
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = offset_y
         self.rendering_complete = True
@@ -512,10 +515,11 @@ class TextElement(DocElement):
                 self.space_top = remaining_space
         self.total_height = total_height + self.space_top + self.space_bottom
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         available_height = container_height - offset_y
         if self.always_print_on_same_page and self.first_render_element and\
-                self.total_height > available_height and (offset_y != 0 or container_top != 0):
+                self.total_height > available_height and (offset_y != 0 or not is_top_of_page):
             return None, False
 
         lines = []
@@ -554,8 +558,8 @@ class TextElement(DocElement):
 
         if self.space_top == 0 and self.line_index == 0 and self.lines_count > 0:
             # even first line does not fit
-            if offset_y != 0 or container_top != 0:
-                # either container is not at top of page or element is not at top inside container
+            if offset_y != 0 or not is_top_of_page:
+                # either element is not at top inside container or container is not at top of page
                 # -> try on next page
                 return None, False
             else:
@@ -1118,7 +1122,8 @@ class TableElement(DocElement):
             self.footer.set_printed_cells(ctx)
             self.footer.prepare(ctx)
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
         if self.is_rendering_complete():
@@ -1129,7 +1134,8 @@ class TableElement(DocElement):
         if self.print_header:
             # create render elements every time header is printed (instead of reusing rendered elements)
             # as header can contain parameters
-            self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
+            self.header.create_render_elements(
+                offset_y, container_top, container_height, is_top_of_page, ctx, pdf_doc)
             render_element.add_band(self.header)
             if not self.header.rendering_complete:
                 return render_element, False
@@ -1165,7 +1171,8 @@ class TableElement(DocElement):
                         content_row.set_parameter_range(parameter=self.data_source_parameter, ctx=ctx)
 
                         content_row.create_render_elements(
-                            offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+                            offset_y + render_element.height, container_top, container_height,
+                            is_top_of_page, ctx, pdf_doc)
 
                         content_row.set_parameter_range(parameter=self.data_source_parameter, ctx=ctx, clear=True)
 
@@ -1190,10 +1197,11 @@ class TableElement(DocElement):
 
             self.row_index += 1
             first_row_on_page = False
+            is_top_of_page = False
 
         if self.row_index >= self.row_count and self.print_footer:
             self.footer.create_render_elements(
-                offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+                offset_y + render_element.height, container_top, container_height, is_top_of_page, ctx, pdf_doc)
             render_element.add_band(self.footer)
             if not self.footer.rendering_complete:
                 return render_element, False
@@ -1507,7 +1515,7 @@ class TableBandElement(object):
 
         return self.container.render_spreadsheet(row, col, ctx, renderer)
 
-    def create_render_elements(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def create_render_elements(self, offset_y, container_top, container_height, is_top_of_page, ctx, pdf_doc):
         available_height = container_height - offset_y
         if self.always_print_on_same_page and available_height < self.height:
             # not enough space for whole band
@@ -1531,7 +1539,7 @@ class TableBandElement(object):
                 self.container.clear_rendered_elements()
 
             self.rendering_complete = self.container.create_render_elements(
-                container_top + offset_y, available_height, ctx=ctx, pdf_doc=pdf_doc)
+                container_top + offset_y, available_height, is_top_of_page=is_top_of_page, ctx=ctx, pdf_doc=pdf_doc)
 
         if self.rendering_complete:
             remaining_min_height = self.height - self.container.max_bottom
@@ -1612,7 +1620,8 @@ class FrameElement(DocElement):
         self.prev_page_content_height = 0
         self.render_element_type = RenderElementType.none
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         self.render_y = offset_y
         available_height = container_height - offset_y
         content_height = container_height
@@ -1630,7 +1639,7 @@ class FrameElement(DocElement):
         if self.first_render_element:
             self.first_render_element = False
             rendering_complete = self.container.create_render_elements(
-                container_top + offset_y, content_height, ctx, pdf_doc)
+                container_top + offset_y, content_height, is_top_of_page, ctx, pdf_doc)
 
             needed_height = self.get_render_bottom()
 
@@ -1677,11 +1686,11 @@ class FrameElement(DocElement):
 
                 self.container.prepare(ctx, pdf_doc=pdf_doc)
                 self.rendering_complete = self.container.create_render_elements(
-                    container_top, content_height, ctx, pdf_doc)
+                    container_top, content_height, is_top_of_page, ctx, pdf_doc)
         else:
             self.container.clear_rendered_elements()
             self.rendering_complete = self.container.create_render_elements(
-                container_top, content_height, ctx, pdf_doc)
+                container_top, content_height, is_top_of_page, ctx, pdf_doc)
         needed_height = self.get_render_bottom()
         self.render_bottom = offset_y + needed_height
 
@@ -1747,7 +1756,7 @@ class SectionBandElement(object):
     def prepare(self, ctx, pdf_doc, only_verify):
         pass
 
-    def create_render_elements(self, offset_y, container_top, container_height, ctx, pdf_doc):
+    def create_render_elements(self, offset_y, container_top, container_height, is_of_top_of_page, ctx, pdf_doc):
         available_height = container_height - offset_y
         if self.always_print_on_same_page and not self.shrink_to_content_height and available_height < self.height:
             # not enough space for whole band
@@ -1759,7 +1768,8 @@ class SectionBandElement(object):
                 # clear render elements from previous page
                 self.container.clear_rendered_elements()
             self.rendering_complete = self.container.create_render_elements(
-                container_top + offset_y, available_height, ctx=ctx, pdf_doc=pdf_doc)
+                container_top + offset_y, available_height,
+                is_top_of_page=is_of_top_of_page, ctx=ctx, pdf_doc=pdf_doc)
 
             if self.container.manual_page_break and self.always_print_on_same_page:
                 # a manual page break is not allowed if the whole content should be printed on the same page
@@ -1873,13 +1883,14 @@ class SectionElement(DocElement):
             if self.footer:
                 self.footer.prepare(ctx, pdf_doc=None, only_verify=True)
 
-    def get_next_render_element(self, offset_y, container_top, container_width, container_height, ctx, pdf_doc):
+    def get_next_render_element(
+            self, offset_y, container_top, container_width, container_height, is_top_of_page, ctx, pdf_doc):
         self.render_y = offset_y
         self.render_bottom = self.render_y
         render_element = SectionRenderElement(self.report, render_y=offset_y)
 
         if self.print_header:
-            self.header.create_render_elements(offset_y, container_top, container_height, ctx, pdf_doc)
+            self.header.create_render_elements(offset_y, container_top, container_height, is_top_of_page, ctx, pdf_doc)
             render_element.add_section_band(self.header, background_color=self.header.style.background_color)
             if not self.header.rendering_complete:
                 return render_element, False
@@ -1890,7 +1901,8 @@ class SectionElement(DocElement):
             # push data context of current row so values of current row can be accessed
             ctx.push_context(self.row_parameters, self.rows[self.row_index], data_source=self.data_source_parameter)
             self.content.create_render_elements(
-                offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+                offset_y + render_element.height, container_top, container_height, is_top_of_page, ctx, pdf_doc)
+            is_top_of_page = False
             ctx.pop_context()
 
             background_color = self.content.style.background_color
@@ -1911,7 +1923,7 @@ class SectionElement(DocElement):
 
         if self.footer:
             self.footer.create_render_elements(
-                offset_y + render_element.height, container_top, container_height, ctx, pdf_doc)
+                offset_y + render_element.height, container_top, container_height, is_top_of_page, ctx, pdf_doc)
             render_element.add_section_band(self.footer, background_color=self.footer.style.background_color)
             if not self.footer.rendering_complete:
                 return render_element, False

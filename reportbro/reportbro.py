@@ -93,7 +93,8 @@ class DocumentPDFRenderer:
             if self.document_properties.footer_display == BandDisplay.always or\
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_count != 1):
                 height -= self.document_properties.footer_size
-            complete = self.content_band.create_render_elements(0, height, self.context, self.pdf_doc)
+            complete = self.content_band.create_render_elements(
+                0, height, is_top_of_page=True, ctx=self.context, pdf_doc=self.pdf_doc)
             if complete:
                 break
             page_count += 1
@@ -121,7 +122,8 @@ class DocumentPDFRenderer:
                 content_offset_y += self.document_properties.header_size
                 self.header_band.prepare(self.context, self.pdf_doc)
                 self.header_band.create_render_elements(
-                    0, self.document_properties.header_size, self.context, self.pdf_doc)
+                    0, self.document_properties.header_size,
+                    is_top_of_page=True, ctx=self.context, pdf_doc=self.pdf_doc)
                 self.header_band.render_pdf(
                     self.document_properties.margin_left, self.document_properties.margin_top, self.pdf_doc)
                 self.header_band.reset()
@@ -129,7 +131,8 @@ class DocumentPDFRenderer:
                     (self.document_properties.footer_display == BandDisplay.not_on_first_page and page_number != 1):
                 self.footer_band.prepare(self.context, self.pdf_doc)
                 self.footer_band.create_render_elements(
-                    0, self.document_properties.footer_size, self.context, self.pdf_doc)
+                    0, self.document_properties.footer_size,
+                    is_top_of_page=True, ctx=self.context, pdf_doc=self.pdf_doc)
                 self.footer_band.render_pdf(self.document_properties.margin_left, footer_offset_y, self.pdf_doc)
                 self.footer_band.reset()
 
