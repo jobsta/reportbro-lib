@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.12.2] - 2026-04-29
+
+### Changes
+* Do not automatically print vertical aligned text on same page
+
+### Bug Fixes
+* Fix endless loop for multipage section text
+
 ## [3.12.1] - 2026-04-10
 
 ### Bug Fixes
