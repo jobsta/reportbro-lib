@@ -78,6 +78,9 @@ class ImageElement(DocElement):
 
         # only load image if available
         if self.image_key:
+            if self.image_key.startswith('data:image/'):
+                self.image = self.image_key
+                self.image_key = 'image_' + str(self.id)
             self.report.load_image(self.image_key, ctx, self.id, self.source, self.image)
 
         if self.link:
