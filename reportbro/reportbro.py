@@ -398,7 +398,7 @@ class ImageData:
             if self.image_type == 'jpg':
                 # set 'jpeg' instead of 'jpg' (same extension as used in Pillow library)
                 self.image_type = 'jpeg'
-            if self.image_type not in ('png', 'jpeg', 'webp'):
+            if self.image_type not in ('png', 'jpeg', 'webp', 'svg'):
                 raise ReportBroError(
                     Error('errorMsgUnsupportedImageType', object_id=image_id, field='source'))
 
@@ -424,7 +424,12 @@ class ImageData:
                 # make sure image file access is restricted to application
                 if os.path.commonprefix([cwd, image_path]) != cwd:
                     raise Exception('Accessing file outside of application path not allowed')
-                self.image_data = open(image_path, 'rb')
+                if self.image_type == 'svg':
+                    # read svg image into string so it can be handled by fpdf2
+                    with open(image_path, 'rb') as f:
+                        self.image_data = f.read()
+                else:
+                    self.image_data = open(image_path, 'rb')
             except Exception as ex:
                 raise ReportBroError(
                     Error('errorMsgLoadingImageFailed', object_id=image_id, field='source', info=str(ex)))
