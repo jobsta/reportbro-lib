@@ -11,6 +11,7 @@ import PIL
 import PIL.Image
 import qrcode
 import qrcode.image.svg
+import resvg_py
 
 from .context import Context
 from .docelement import DocElementBase, DocElement
@@ -102,7 +103,20 @@ class ImageElement(DocElement):
             image = self.report.get_image(self.image_key)
             if image and image.image_data:
                 try:
-                    raw_image = PIL.Image.open(image.image_data)
+                    if image.image_type == 'svg':
+                        # convert svg to png with resvg_py as neither XlsxWriter (to write svg directly to spreadsheet)
+                        # nor Pillow can handle svg format
+                        png_data = resvg_py.svg_to_bytes(
+                            svg_string=image.image_data.decode('utf-8'),
+                            width=self.width,
+                            height=self.height,
+                        )
+                        raw_image = PIL.Image.open(BytesIO(png_data))
+                        image.image_data = BytesIO()
+                        image.image_type = 'png'
+                        raw_image.save(image.image_data, format='PNG')
+                    else:
+                        raw_image = PIL.Image.open(image.image_data)
                 except Exception as ex:
                     raise ReportBroError(
                         Error('errorMsgLoadingImageFailed', object_id=self.id,
