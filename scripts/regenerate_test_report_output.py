@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import time
-from tests.test_report_render import ReportRenderTest, DEMOS, GUIDES, MISC_TESTS
+from tests.test_report_render import ReportRenderTest, DEMOS, GUIDES, MISC_TESTS, PARAMETER_TESTS,\
+    get_report_parameter_render_data
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -30,6 +31,13 @@ if __name__ == "__main__":
         for test in MISC_TESTS:
             if not report_name or test == report_name:
                 ReportRenderTest('misc', test).update_report_output(
+                    update_file=True, update_checksum=False, overwrite=overwrite)
+    if not group_name or group_name == 'parameter':
+        for test in PARAMETER_TESTS:
+            if not report_name or test == report_name:
+                ReportRenderTest(
+                    'parameter', test,
+                    parameter_data=get_report_parameter_render_data(test)).update_report_output(
                     update_file=True, update_checksum=False, overwrite=overwrite)
     end = time.process_time_ns()
     used_cpu_time = int((end - start) / 1000000)  # convert from ns to ms

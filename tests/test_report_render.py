@@ -16,16 +16,24 @@ MISC_TESTS = [
     'barcode', 'border', 'line', 'hello_world', 'section_text', 'spreadsheet_type', 'style',
     'table_group', 'text_justified', 'thousands_separator',
 ]
+PARAMETER_TESTS = [
+    'svg_image',
+]
 
 
 class ReportRenderTest:
     formats = ['pdf', 'xlsx']
 
-    def __init__(self, prefix_dir: str, name: str):
+    def __init__(self, prefix_dir: str, name: str, encode_error_handling: str = 'strict', parameter_data: dict = None):
         self.name = name
         self.base_dir = BASEDIR.joinpath(prefix_dir).joinpath(name)
+        self.encode_error_handling = encode_error_handling
+        self.is_test_data = True
         self._test_data = None
         self._report_definition = None
+        if parameter_data:
+            self.is_test_data = False
+            self._test_data = parameter_data
 
     def _get_report_definition(self) -> dict:
         if not self._report_definition:
@@ -62,8 +70,9 @@ class ReportRenderTest:
         ]
 
         report = Report(
-            report_definition=self._get_report_definition(), data=self._get_data(), is_test_data=True,
-            additional_fonts=additional_fonts
+            report_definition=self._get_report_definition(), data=self._get_data(), is_test_data=self.is_test_data,
+            additional_fonts=additional_fonts,
+            allow_local_image=not self.is_test_data, allow_external_image=not self.is_test_data,
         )
         report.set_creation_date('2023-03-23 10:01:24')
         return report
@@ -142,3 +151,15 @@ def test_report_guide_render(guide_name):
 @pytest.mark.parametrize('misc_name', MISC_TESTS)
 def test_report_misc_render(misc_name):
     ReportRenderTest('misc', misc_name).run()
+
+
+@pytest.mark.parametrize('report_name', PARAMETER_TESTS)
+def test_report_parameter_render(report_name):
+    ReportRenderTest('parameter', report_name, parameter_data=get_report_parameter_render_data(report_name)).run()
+
+
+def get_report_parameter_render_data(report_name):
+    parameter_data = dict()
+    if report_name == 'svg_image':
+        parameter_data = dict(signature='file:tests/data/parameter/svg_image/signature.svg')
+    return parameter_data
