@@ -41,6 +41,7 @@ class Context:
             format_decimal=self.format_decimal_func,
             len=len,
             abs=abs,
+            round=round,
             floor=math.floor,
             ceil=math.ceil,
         )
