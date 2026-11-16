@@ -102,6 +102,8 @@ class ReportRenderTest:
 
     def update_report_output(self, update_file: bool = True, update_checksum: bool = False, overwrite: bool = True):
         for format_type in ReportRenderTest.formats:
+            update_current_file = update_file
+            update_current_checksum = update_checksum
             report = self._get_report()
             assert len(report.errors) == 0
             report_data = self.generate_report_data(format_type)
@@ -110,12 +112,12 @@ class ReportRenderTest:
                 calculated_checksum = sha256(report_data).hexdigest()
                 test_checksum = self._get_checksum(format_type)
                 if test_checksum == calculated_checksum:
-                    update_file = update_checksum = False
+                    update_current_file = update_current_checksum = False
 
-            if update_checksum:
+            if update_current_checksum:
                 self._get_checksum_file_name(format_type, overwrite=overwrite).write_text(
                     sha256(report_data).hexdigest(), 'utf-8')
-            if update_file:
+            if update_current_file:
                 self._get_reference_report_file_name(format_type, overwrite=overwrite).write_bytes(report_data)
 
     def generate_report_data(self, format_type: str):
