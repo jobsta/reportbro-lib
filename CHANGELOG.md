@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.13.0] - 2026-11-16
+
+### Features
+* Support svg images
+
+### Changes
+* Cut off line at endpoints so it does not extend beyond start / end
+* Add "round" to available functions for evaluating expressions
+* Drop support for Python 3.10 (EOL October 2026)
+* Update Pillow dependency to fix security warnings
+* Update simpleeval and uharfbuzz dependency
+
 ## [3.12.2] - 2026-04-29
 
 ### Changes
